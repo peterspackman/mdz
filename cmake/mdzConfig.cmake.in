@@ -1,0 +1,7 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+if(@MDZ_ZSTD_FIND_DEPENDENCY@)
+  find_dependency(zstd CONFIG)
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/mdzTargets.cmake")

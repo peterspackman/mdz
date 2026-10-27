@@ -1,0 +1,9 @@
+*.dcd binary
+*.mdz binary
+*.xtc binary
+*.npy binary
+
+# Reference files are compared byte for byte; never convert their line endings.
+tests/cpp/fixtures/** -text
+tests/cpp/golden/** -text
+examples/** -text

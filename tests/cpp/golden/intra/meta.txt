@@ -1,0 +1,12 @@
+natoms=250
+nframes=21
+gof_size=20
+precision=1.25e-4
+predictor_order=0
+zstd_level=3
+adaptive=1
+anchor_step=1
+codec=intra
+spatial_delta=1
+lossless=0
+decoded_fnv1a=ef518859b8fe4b9a

@@ -1,0 +1,37 @@
+# Build artifacts
+dist/
+*.egg-info/
+
+# Python
+uv.lock
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+
+# Compiled extensions
+*.so
+*.pyd
+*.dylib
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large data directories
+examples/olivine_nvt/
+
+# Generated example outputs
+test.mdz
+examples/*.mdz
+examples/*.xyz
+examples/*.extxyz
+
+# macOS
+.DS_Store
+
+# CMake build trees
+build*/

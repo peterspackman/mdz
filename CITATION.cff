@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use mdz in your research, please cite it using these metadata."
+type: software
+title: "mdz: molecular dynamics trajectory compression with fast random access"
+abstract: >-
+  mdz compresses molecular dynamics trajectories (positions, velocities,
+  forces and per-frame data) using inter-frame prediction, adaptive
+  quantization and zstd, in groups of frames that are individually indexed
+  for fast random access. It provides a C++ library, a command-line tool,
+  Python bindings, a C API and a LAMMPS dump style.
+authors:
+  - family-names: Spackman
+    given-names: Peter
+    email: peterspackman@fastmail.com
+repository-code: "https://github.com/peterspackman/mdz-cpp"
+url: "https://github.com/peterspackman/mdz-cpp"
+license: MIT
+version: 0.4.0
+keywords:
+  - molecular dynamics
+  - trajectory
+  - compression
+  - random access

@@ -1,0 +1,15 @@
+# a rigid triangle
+
+3 atoms
+
+Coords
+
+1 0.0 0.0 0.0
+2 1.2 0.0 0.0
+3 0.6 1.0 0.0
+
+Types
+
+1 1
+2 2
+3 2

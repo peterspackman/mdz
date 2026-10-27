@@ -1,0 +1,25 @@
+# Rigid 13-atom clusters in a Lennard-Jones solvent.
+units lj
+atom_style molecular
+boundary p p p
+region box block 0 35 0 35 0 35
+create_box 3 box
+molecule cluster cluster.mol
+create_atoms 0 random 1500 4821 NULL mol cluster 9137 overlap 1.6 maxtry 100
+create_atoms 3 random 10000 2231 NULL overlap 1.0 maxtry 100
+mass * 1.0
+pair_style lj/cut 2.5
+pair_coeff * * 1.0 1.0
+neigh_modify exclude molecule/intra all
+group clusters type 1 2
+group solvent type 3
+velocity all create 1.0 87287
+fix 1 clusters rigid/small molecule langevin 1.0 1.0 1.0 4211
+fix 2 solvent nve
+fix 3 solvent langevin 1.0 1.0 1.0 9917
+timestep 0.002
+thermo 1000
+run 3000
+timestep 0.005
+run 5000
+write_restart eq.restart

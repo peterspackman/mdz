@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-gcc, os: ubuntu-latest, cc: gcc, cxx: g++ }
+          - { name: linux-clang, os: ubuntu-latest, cc: clang, cxx: clang++ }
+          - { name: macos, os: macos-latest }
+          - { name: windows, os: windows-latest }
+    defaults:
+      run:
+        shell: bash
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        # Treat warnings as errors so the build stays warning-free.
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: C++ tests
+        run: ctest --test-dir build -C Release --output-on-failure
+      - uses: astral-sh/setup-uv@v5
+      - name: CLI tests
+        run: |
+          cli=build/cli/mdz
+          [ -x "$cli" ] || cli=build/cli/Release/mdz.exe
+          MDZ_CLI="$PWD/$cli" uv run --no-project --with pytest python -m pytest cli/tests -q
+      - name: Python tests
+        run: |
+          uv venv --clear
+          uv pip install . numpy pytest
+          uv run python -m pytest tests/ -q
+
+  # ASan + UBSan over the C++ tests and a pass of every fuzz target.
+  sanitizers:
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DMDZ_SANITIZE=ON -DMDZ_FUZZ=ON
+      - run: cmake --build build --parallel
+      - run: ctest --test-dir build --output-on-failure
+
+  # A short fuzzing pass on every change. A couple of minutes per target
+  # catches most decoder regressions. See fuzz/CMakeLists.txt for longer
+  # local runs.
+  fuzz:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [mdz_file, gof_payload, metadata, formats]
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DMDZ_SANITIZE=ON -DMDZ_FUZZ=ON
+          -DMDZ_BUILD_CLI=OFF -DMDZ_BUILD_TESTS=OFF -DMDZ_BUILD_BENCH=OFF
+      - run: cmake --build build --parallel --target gen_corpus fuzz_${{ matrix.target }}
+      - name: Seed corpus
+        run: build/fuzz/gen_corpus corpus && mkdir -p corpus/formats && cp examples/*.dcd examples/lammps/* corpus/formats/
+      - name: Fuzz ${{ matrix.target }}
+        run: >
+          mkdir -p artifacts &&
+          build/fuzz/fuzz_${{ matrix.target }} corpus/${{ matrix.target }}
+          -max_total_time=120 -rss_limit_mb=2048 -artifact_prefix=artifacts/
+      - name: Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: artifacts
+
+  # Build mdz the ways downstream projects consume it: against a system zstd,
+  # through add_subdirectory, and through find_package after an install.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libzstd-dev
+      - name: Against the system zstd
+        run: |
+          cmake -S . -B build-sys -DMDZ_ZSTD=system -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-sys --parallel
+          ctest --test-dir build-sys --output-on-failure
+      - name: add_subdirectory and find_package
+        run: |
+          cmake -S . -B build-inst -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/prefix"
+          cmake --build build-inst --parallel --target install
+          for mode in subdir package; do
+            cmake -S tests/consumer -B "build-consumer-$mode" -DMODE=$mode \
+              -DMDZ_SOURCE_DIR="$PWD" -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/prefix"
+            cmake --build "build-consumer-$mode" --parallel
+            "build-consumer-$mode/consumer"
+          done
+
+  # Build a serial LAMMPS with the PLUGIN package, then the mdz dump plugin,
+  # and compare a short run against LAMMPS's own dump custom output.
+  lammps-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
+      - name: Fetch LAMMPS (stable branch)
+        run: |
+          git clone --depth 1 --branch stable https://github.com/lammps/lammps.git "$RUNNER_TEMP/lammps"
+          echo "LAMMPS_SHA=$(git -C "$RUNNER_TEMP/lammps" rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Cache the LAMMPS build
+        id: lammps-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/lammps/build
+          key: lammps-mpi-plugin-${{ env.LAMMPS_SHA }}
+      - name: Build LAMMPS
+        if: steps.lammps-cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S "$RUNNER_TEMP/lammps/cmake" -B "$RUNNER_TEMP/lammps/build" \
+            -D BUILD_MPI=on -D BUILD_OMP=off -D PKG_PLUGIN=on -D CMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/lammps/build" -j 4
+      - name: Build the mdz CLI
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel --target mdz_cli
+      - name: Build the plugin
+        run: |
+          cmake -S lammps -B build-plugin -D LAMMPS_SOURCE_DIR="$RUNNER_TEMP/lammps/src" -D BUILD_MPI=on
+          cmake --build build-plugin
+      - name: Smoke test
+        run: >
+          lammps/tests/run.sh "$RUNNER_TEMP/lammps/build/lmp"
+          "$PWD/build-plugin/mdzplugin.so" "$PWD/build/cli/mdz"
+      - name: Smoke test on 2 MPI ranks
+        env:
+          MPIRUN: mpirun --oversubscribe -np 2
+        run: >
+          lammps/tests/run.sh "$RUNNER_TEMP/lammps/build/lmp"
+          "$PWD/build-plugin/mdzplugin.so" "$PWD/build/cli/mdz"

@@ -1,0 +1,15 @@
+read_restart eq.restart
+molecule cluster cluster.mol
+pair_style lj/cut 2.5
+pair_coeff * * 1.0 1.0
+neigh_modify exclude molecule/intra all
+group clusters type 1 2
+group solvent type 3
+fix 1 clusters rigid/small molecule langevin 1.0 1.0 1.0 4211
+fix 2 solvent nve
+fix 3 solvent langevin 1.0 1.0 1.0 9917
+timestep 0.005
+thermo 10000
+dump d all custom ${every} clusters_${every}.lammpstrj id mol type xu yu zu
+dump_modify d sort id
+run $(v_every*300)

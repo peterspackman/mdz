@@ -1,0 +1,220 @@
+name: Release
+
+# Pushing a tag vX.Y.Z builds and publishes everything:
+#   1. check the tag matches the version in CMakeLists.txt;
+#   2. run the test suite on Linux, macOS and Windows;
+#   3. build wheels, the sdist and the CLI binaries;
+#   4. create the GitHub release (binaries + SHA256SUMS);
+#   5. publish to PyPI.
+# Nothing is published unless every earlier step succeeded.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  # --- Gate ---
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the project version
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+
+          tag = os.environ["TAG"]
+          m = re.fullmatch(r"v(\d+\.\d+\.\d+)", tag)
+          if not m:
+              sys.exit(f"tag {tag!r} is not of the form vX.Y.Z")
+          version = m.group(1)
+          cmake = open("CMakeLists.txt").read()
+          found = re.search(r"project\(mdz\s+VERSION\s+([0-9.]+)", cmake)
+          if not found or found.group(1) != version:
+              sys.exit(f"tag {tag} does not match CMakeLists.txt version {found and found.group(1)}")
+          print(f"version {version} OK")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"version={version}\n")
+          PY
+
+  test:
+    name: test (${{ matrix.os }})
+    needs: check-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --config Release --parallel
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - uses: astral-sh/setup-uv@v5
+      - name: Python tests
+        run: |
+          uv venv --clear
+          uv pip install . numpy pytest
+          uv run python -m pytest tests/ -q
+
+  # --- Python wheels (cibuildwheel + scikit-build-core) ---
+  wheels:
+    name: wheels (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-14, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/cibuildwheel@v2.23.3
+        env:
+          CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_i686"
+          CIBW_TEST_REQUIRES: numpy pytest
+          CIBW_TEST_COMMAND: python -m pytest {project}/tests -q
+          MACOSX_DEPLOYMENT_TARGET: "10.15"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  sdist:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build --sdist --out-dir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # --- CLI binaries ---
+  cli:
+    name: cli (${{ matrix.name }})
+    needs: test
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          # Linux binaries are built in Alpine and linked statically against
+          # musl, so they run on any distribution.
+          - { name: linux-x86_64, runner: ubuntu-latest }
+          - { name: linux-aarch64, runner: ubuntu-24.04-arm }
+          - { name: macos-x86_64, runner: macos-15-intel }
+          - { name: macos-arm64, runner: macos-14 }
+          - { name: windows-x86_64, runner: windows-latest }
+    defaults:
+      run:
+        shell: bash
+    env:
+      NAME: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build (Linux, static, in Alpine)
+        if: startsWith(matrix.name, 'linux')
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src alpine:3.20 sh -c '
+            apk add --no-cache build-base cmake ninja git linux-headers &&
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMDZ_BUILD_TESTS=OFF \
+                  -DMDZ_BUILD_BENCH=OFF -DCMAKE_EXE_LINKER_FLAGS=-static &&
+            cmake --build build --target mdz_cli &&
+            strip build/cli/mdz'
+          sudo chown -R "$(id -u)" build
+      - name: Build (macOS, Windows)
+        if: "!startsWith(matrix.name, 'linux')"
+        run: |
+          case "$NAME" in
+            # Static CRT, so the .exe does not need the VC++ runtime.
+            windows-*) extra="-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" ;;
+            macos-*) extra="-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15" ;;
+          esac
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMDZ_BUILD_TESTS=OFF -DMDZ_BUILD_BENCH=OFF $extra
+          cmake --build build --config Release --parallel --target mdz_cli
+      - name: Package
+        run: |
+          dir="mdz-${GITHUB_REF_NAME}-${NAME}"
+          mkdir "$dir"
+          cp README.md LICENSE "$dir/"
+          if [[ "$NAME" == windows-* ]]; then
+            bin=build/cli/Release/mdz.exe
+            cp "$bin" "$dir/"
+            7z a "$dir.zip" "$dir" > /dev/null
+            echo "ASSET=$dir.zip" >> "$GITHUB_ENV"
+          else
+            bin=build/cli/mdz
+            cp "$bin" "$dir/"
+            tar czf "$dir.tar.gz" "$dir"
+            echo "ASSET=$dir.tar.gz" >> "$GITHUB_ENV"
+          fi
+          "$bin" --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.name }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+  # --- GitHub Release ---
+  github-release:
+    needs: [check-version, test, wheels, sdist, cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Checksums
+        working-directory: artifacts
+        run: |
+          sha256sum -- * | tee SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          # CLI archives, wheels, the sdist, and SHA256SUMS covering them all.
+          files: artifacts/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  # --- Publish ---
+  # Uses PyPI trusted publishing, so no API token is stored. The trusted
+  # publisher on PyPI must be set to this repository, workflow release.yml and
+  # environment `pypi`.
+  publish-pypi:
+    needs: [github-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/mdz/
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - run: ls -l dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
