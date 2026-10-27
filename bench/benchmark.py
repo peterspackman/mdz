@@ -65,7 +65,10 @@ def size_table(by_file):
     for path in sorted(by_file, key=sort_key):
         rows = {(r["method"], r["threads"]): r for r in by_file[path]}
         t1 = min(r["threads"] for r in by_file[path])
-        get = lambda m: rows.get((m, t1)) or rows.get((m, 1))
+
+        def get(m):
+            return rows.get((m, t1)) or rows.get((m, 1))
+
         raw = get("mdz")["raw_bytes"]
         xtc, mdz, ll, z, rig = get("xtc"), get("mdz"), get("mdz-lossless"), get("zstd-raw"), get("mdz-rigid")
         tmp, intra = get("mdz-temporal"), get("mdz-intra")

@@ -3,6 +3,7 @@
 import os
 import tempfile
 import warnings
+
 import numpy as np
 import pytest
 
@@ -20,9 +21,7 @@ class TestExtxyz:
                 comment_parts = ["Properties=species:S:1:pos:R:3"]
                 if cell is not None:
                     a, b, c = cell
-                    comment_parts.append(
-                        f'Lattice="{a:.6f} 0.0 0.0 0.0 {b:.6f} 0.0 0.0 0.0 {c:.6f}"'
-                    )
+                    comment_parts.append(f'Lattice="{a:.6f} 0.0 0.0 0.0 {b:.6f} 0.0 0.0 0.0 {c:.6f}"')
                 comment_parts.append('pbc="T T T"')
                 f.write(" ".join(comment_parts) + "\n")
                 for atom in range(natoms):
@@ -41,7 +40,7 @@ class TestExtxyz:
                 if not line:
                     break
                 natoms = int(line.strip())
-                comment = f.readline()  # comment line
+                f.readline()  # comment line
                 positions = []
                 names = []
                 for _ in range(natoms):
@@ -82,10 +81,13 @@ class TestXyz:
         natoms = 3
         nframes = 2
         # Positions in Angstroms
-        positions_ang = np.array([
-            [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
-            [[1.1, 2.1, 3.1], [4.1, 5.1, 6.1], [7.1, 8.1, 9.1]],
-        ], dtype=np.float32)
+        positions_ang = np.array(
+            [
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
+                [[1.1, 2.1, 3.1], [4.1, 5.1, 6.1], [7.1, 8.1, 9.1]],
+            ],
+            dtype=np.float32,
+        )
 
         with tempfile.NamedTemporaryFile(suffix=".xyz", delete=False, mode="w") as f:
             path = f.name
@@ -93,9 +95,11 @@ class TestXyz:
                 f.write(f"{natoms}\n")
                 f.write("comment\n")
                 for atom in range(natoms):
-                    f.write(f"X {positions_ang[frame, atom, 0]:.6f} "
-                            f"{positions_ang[frame, atom, 1]:.6f} "
-                            f"{positions_ang[frame, atom, 2]:.6f}\n")
+                    f.write(
+                        f"X {positions_ang[frame, atom, 0]:.6f} "
+                        f"{positions_ang[frame, atom, 1]:.6f} "
+                        f"{positions_ang[frame, atom, 2]:.6f}\n"
+                    )
 
         try:
             frames = []
@@ -134,9 +138,11 @@ class TestLammps:
                 f.write(f"0.0 {box_size}\n")
                 f.write("ITEM: ATOMS id type x y z\n")
                 for atom in range(natoms):
-                    f.write(f"{atom+1} 1 {positions_ang[frame, atom, 0]:.6f} "
-                            f"{positions_ang[frame, atom, 1]:.6f} "
-                            f"{positions_ang[frame, atom, 2]:.6f}\n")
+                    f.write(
+                        f"{atom + 1} 1 {positions_ang[frame, atom, 0]:.6f} "
+                        f"{positions_ang[frame, atom, 1]:.6f} "
+                        f"{positions_ang[frame, atom, 2]:.6f}\n"
+                    )
 
     def _read_lammps(self, path):
         frames = []
@@ -214,9 +220,7 @@ class TestConvert:
             # Converting back to .mdz reads the file with that format's reader.
             again = str(tmp_path / f"again_{ext}.mdz")
             mdz.convert(out, again)
-            np.testing.assert_allclose(
-                mdz.open(again).read_all(), pos / 10.0, atol=2e-3, err_msg=ext
-            )
+            np.testing.assert_allclose(mdz.open(again).read_all(), pos / 10.0, atol=2e-3, err_msg=ext)
 
     def test_npy_output(self, tmp_path):
         import mdz

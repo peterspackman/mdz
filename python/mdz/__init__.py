@@ -55,7 +55,8 @@ body index per atom).
 Call ``mdz.set_num_threads(n)`` to limit the number of worker threads.
 """
 
-from importlib.metadata import PackageNotFoundError, version as _version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
 
 try:
     # scikit-build-core takes the package version from CMakeLists.txt.
@@ -66,17 +67,17 @@ except PackageNotFoundError:  # pragma: no cover - running from a bare checkout
 try:
     from mdz._core import (
         MdzReader,
-        Writer,
         Trajectory,
+        Writer,
         compress,
         compress_batch,
-        decompress,
-        save,
-        load,
-        open,
-        info,
         convert,
         decode_boxes,
+        decompress,
+        info,
+        load,
+        open,
+        save,
         set_num_threads,
     )
 except ImportError as exc:  # pragma: no cover

@@ -5,13 +5,12 @@ XTC files are read and written with mdtraj, which wraps the C xdrfile library.
 
 import os
 import sys
-import time
 import tempfile
+import time
 
-import numpy as np
 import mdtraj
-
 import mdz
+import numpy as np
 
 
 def benchmark_xtc(traj, precision_nm, label=""):
@@ -100,7 +99,7 @@ def benchmark_mdz(traj, precision_nm, label="", **opts):
             "ratio": raw_bytes / mdz_size if mdz_size > 0 else 0,
             "write_mb_s": raw_bytes / 1e6 / t_write,
             "read_mb_s": raw_bytes / 1e6 / t_read,
-            "max_err_A": float(err.max()) * 10,   # nm -> A
+            "max_err_A": float(err.max()) * 10,  # nm -> A
             "mean_err_A": float(err.mean()) * 10,
         }
     finally:
@@ -118,7 +117,7 @@ def print_results(results):
     for r in results:
         if r is None:
             continue
-        max_err_str = f"{r['max_err_A']:.4f}" if r['max_err_A'] is not None else "n/a"
+        max_err_str = f"{r['max_err_A']:.4f}" if r["max_err_A"] is not None else "n/a"
         print(
             f"{r['format']:<8} {r['label']:<25} {r['ratio']:>7.1f}x "
             f"{r['compressed_mb']:>9.2f} {r['write_mb_s']:>10.1f} "
@@ -135,7 +134,7 @@ def main():
             continue
 
         file_size_mb = os.path.getsize(dcd_path) / 1e6
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"Trajectory: {dcd_path} ({file_size_mb:.1f} MB)")
 
         # mdtraj needs the trajectory loaded for the XTC benchmark. Very large
@@ -159,6 +158,7 @@ def main():
             # Otherwise build a placeholder topology, reading the atom count
             # from the DCD header.
             import struct
+
             with open(dcd_path, "rb") as fh:
                 fh.seek(4 + 84 + 4)  # skip first record
                 title_sz = struct.unpack("<I", fh.read(4))[0]
@@ -193,9 +193,15 @@ def main():
         # mdz without adaptive precision or B-frames, which is closer to how
         # XTC quantizes.
         print("Benchmarking mdz (no adaptive, no B-frames)...")
-        results.append(benchmark_mdz(
-            traj, 0.001, "no-adapt no-B", adaptive=False, anchor_step=1,
-        ))
+        results.append(
+            benchmark_mdz(
+                traj,
+                0.001,
+                "no-adapt no-B",
+                adaptive=False,
+                anchor_step=1,
+            )
+        )
 
         print()
         print_results(results)

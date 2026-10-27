@@ -6,8 +6,9 @@ Keep in sync with ``bindings/python/*.cpp``.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from types import TracebackType
-from typing import Any, Iterator, Literal, final, overload
+from typing import Any, Literal, final, overload
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray

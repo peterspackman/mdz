@@ -6,10 +6,9 @@ import importlib.metadata
 import importlib.util
 import os
 
+import mdz
 import numpy as np
 import pytest
-
-import mdz
 
 PRECISION = 0.001  # nm; the adaptive maximum error is 4 * PRECISION
 TOL = 4 * PRECISION + 1e-6
@@ -60,9 +59,7 @@ class TestInputLayouts:
 
     def test_fortran_boxes(self):
         p = _pos()
-        boxes = np.asfortranarray(
-            np.stack([np.array([[3, 0, 0], [0.5, 3, 0], [0.2, 0.1, 3]]) + i for i in range(20)])
-        )
+        boxes = np.asfortranarray(np.stack([np.array([[3, 0, 0], [0.5, 3, 0], [0.2, 0.1, 3]]) + i for i in range(20)]))
         _, rb = mdz.decompress(mdz.compress(p, boxes=boxes, precision=PRECISION))
         np.testing.assert_allclose(rb, boxes, atol=1e-6)
 
@@ -70,17 +67,13 @@ class TestInputLayouts:
         p = _pos()
         vel = np.asfortranarray(_pos(seed=2).astype(np.float64))
         charge = _pos(seed=3)[:, :, 0].T.copy().T  # F-ordered (nframes, natoms)
-        ct = mdz.compress_batch(
-            p.astype(np.float64), velocities=vel, charge=charge, precision=PRECISION
-        )
+        ct = mdz.compress_batch(p.astype(np.float64), velocities=vel, charge=charge, precision=PRECISION)
         assert np.abs(ct.read_column("velocities") - vel).max() <= TOL
         assert np.abs(ct.read_column("charge") - charge).max() <= TOL
 
 
 class TestShapeValidation:
-    @pytest.mark.parametrize(
-        "shape", [(20, 10, 4), (20, 10, 2), (20, 10), (20, 10, 3, 1), (0, 10, 3), (20, 0, 3)]
-    )
+    @pytest.mark.parametrize("shape", [(20, 10, 4), (20, 10, 2), (20, 10), (20, 10, 3, 1), (0, 10, 3), (20, 0, 3)])
     def test_bad_positions_shape(self, shape):
         with pytest.raises(ValueError):
             mdz.compress(np.zeros(shape, dtype=np.float32))
@@ -181,9 +174,7 @@ class TestCellColumns:
         n = 20
         boxes = np.tile(np.eye(3, dtype=np.float32) * 3.0, (n, 1, 1))
         cell = np.tile([3.0, 90.0, 3.0, 90.0, 90.0, 3.0], (n, 1))
-        ct = mdz.compress_batch(
-            _pos(), boxes=boxes, cell=cell, time=np.arange(n) * 0.5, precision=PRECISION
-        )
+        ct = mdz.compress_batch(_pos(), boxes=boxes, cell=cell, time=np.arange(n) * 0.5, precision=PRECISION)
         box_col = ct.read_column("box")
         assert box_col.shape == (n, 3, 3)
         np.testing.assert_array_equal(box_col, boxes)
@@ -289,9 +280,8 @@ class TestPackaging:
 
 @pytest.mark.skipif(importlib.util.find_spec("ovito") is None, reason="needs OVITO")
 def test_ovito_reader_builds_cell_from_box(tmp_path):  # pragma: no cover
-    from ovito.io import import_file
-
     from mdz.ovito_reader import MdzFileReader
+    from ovito.io import import_file
 
     boxes = np.tile(np.array([[3, 0, 0], [1, 3, 0], [0, 0, 3]], np.float32), (20, 1, 1))
     path = str(tmp_path / "box.mdz")
@@ -303,9 +293,9 @@ def test_ovito_reader_builds_cell_from_box(tmp_path):  # pragma: no cover
 def _steps_boxes(nframes, first_step=0):
     steps = np.arange(nframes, dtype=np.int64) * 1000 + first_step
     times = np.arange(nframes, dtype=np.float64) * 0.002
-    boxes = np.stack(
-        [np.array([[3, 0, 0], [0.5, 3, 0], [0.2, 0.1, 3]]) + 0.01 * i for i in range(nframes)]
-    ).astype(np.float32)
+    boxes = np.stack([np.array([[3, 0, 0], [0.5, 3, 0], [0.2, 0.1, 3]]) + 0.01 * i for i in range(nframes)]).astype(
+        np.float32
+    )
     return steps, times, boxes
 
 
@@ -335,9 +325,7 @@ class TestWriter:
             assert w.frames_written == 50
         assert w.closed and w.frames_written == 50 and w.frames_committed == 50
 
-        ref_pos, ref_boxes = mdz.decompress(
-            mdz.compress(pos, boxes=boxes, precision=PRECISION, gof_size=10)
-        )
+        ref_pos, ref_boxes = mdz.decompress(mdz.compress(pos, boxes=boxes, precision=PRECISION, gof_size=10))
         ct = mdz.load(path)
         got_pos, got_boxes = mdz.decompress(ct)
         np.testing.assert_array_equal(got_pos, ref_pos)
@@ -351,14 +339,16 @@ class TestWriter:
         names = [f"A{i}" for i in range(8)]
         types = list(range(1, 9))
         path = tmp_path / "cols.mdz"
-        with mdz.Writer(
-            path, atom_names=names, atom_types=types, precision=PRECISION, gof_size=10
-        ) as w:
+        with mdz.Writer(path, atom_names=names, atom_types=types, precision=PRECISION, gof_size=10) as w:
             for a, b in [(0, 4), (4, 5), (5, 30)]:
                 w.write(pos[a:b], velocities=vel[a:b])
         ref = mdz.compress_batch(
-            pos, velocities=vel, atom_names=names, atom_types=types,
-            precision=PRECISION, gof_size=10,
+            pos,
+            velocities=vel,
+            atom_names=names,
+            atom_types=types,
+            precision=PRECISION,
+            gof_size=10,
         )
         ct = mdz.load(path)
         for col in ("positions", "velocities"):
@@ -442,8 +432,7 @@ class TestWriter:
         assert mdz.open(path).nframes == 40
 
         # A file that was never closed can be appended to.
-        with mdz.Writer(tmp_path / "after_flush.mdz", append=True,
-                        precision=PRECISION, gof_size=10) as w2:
+        with mdz.Writer(tmp_path / "after_flush.mdz", append=True, precision=PRECISION, gof_size=10) as w2:
             w2.write(pos[25:], step=np.arange(25, 40))
         r = mdz.open(tmp_path / "after_flush.mdz")
         assert len(r) == 40
@@ -520,9 +509,8 @@ class TestWriter:
 
 @pytest.mark.skipif(importlib.util.find_spec("ovito") is None, reason="needs OVITO")
 def test_ovito_reader_varying_atoms(tmp_path):  # pragma: no cover
-    from ovito.io import import_file
-
     from mdz.ovito_reader import MdzFileReader
+    from ovito.io import import_file
 
     path = str(tmp_path / "vary.mdz")
     rng = np.random.default_rng(0)

@@ -6,6 +6,7 @@ usage: python3 check.py MDZ_CLI   (run in the directory the inputs ran in)
 MDZ_CLI is the mdz command-line tool, run as
 `MDZ_CLI -q decompress -f IN.mdz -o OUT.lammpstrj`.
 """
+
 import os
 import subprocess
 import sys
@@ -89,8 +90,9 @@ compare(ref, frames("var.lammpstrj"), rel=1.2e-7)
 decompress(cli, "fixed.mdz", "fixed.lammpstrj")
 same = [f for f in ref if f["atoms"].keys() == ref[0]["atoms"].keys()]
 compare(same, frames("fixed.lammpstrj"), rel=1.2e-7)
-print(f"ok: varying atoms {min(counts)}-{max(counts)} per frame, exact; "
-      f"fixed file kept {len(same)} of {len(ref)} frames")
+print(
+    f"ok: varying atoms {min(counts)}-{max(counts)} per frame, exact; fixed file kept {len(same)} of {len(ref)} frames"
+)
 
 if os.path.exists("ref_rigid.dump"):
     decompress(cli, "rigid.mdz", "rigid.lammpstrj")

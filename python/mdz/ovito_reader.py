@@ -19,14 +19,13 @@ per-frame box becomes the simulation cell, and other per-frame values
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
-
+import traits.api
 from ovito.data import DataCollection
 from ovito.io import FileReaderInterface
-import traits.api
-
 
 # mdz stores lengths in nm, as GROMACS does. OVITO's defaults (element radii,
 # cell rendering, chemistry-aware modifiers) assume Angstrom, so lengths are

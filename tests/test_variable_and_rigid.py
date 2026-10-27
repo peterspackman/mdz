@@ -1,9 +1,8 @@
 """Atom counts that vary from frame to frame, and rigid bodies, from Python."""
 
+import mdz
 import numpy as np
 import pytest
-
-import mdz
 
 PRECISION = 0.000125
 TOL = 4 * PRECISION + 1e-6

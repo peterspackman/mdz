@@ -12,8 +12,8 @@ atom names + types in metadata.
 from __future__ import annotations
 
 import os
-import numpy as np
 
+import numpy as np
 from mdz._core import compress_batch
 
 

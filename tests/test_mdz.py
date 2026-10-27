@@ -7,10 +7,9 @@ multi-column batches, and the precision contract.
 
 from __future__ import annotations
 
+import mdz
 import numpy as np
 import pytest
-
-import mdz
 
 PRECISION = 0.001  # nm
 
@@ -100,9 +99,20 @@ class TestLossless:
         # likely to expose a codec that is only exact for typical input. The
         # bit comparison makes -0.0 decoding as 0.0 a failure.
         awkward = np.array(
-            [0.0, -0.0, 1.0, -1.0, 1e-40, -1e-40,
-             np.finfo(np.float32).max, np.finfo(np.float32).min,
-             np.finfo(np.float32).tiny, 1 / 3, -2.5e-7, 12345.678],
+            [
+                0.0,
+                -0.0,
+                1.0,
+                -1.0,
+                1e-40,
+                -1e-40,
+                np.finfo(np.float32).max,
+                np.finfo(np.float32).min,
+                np.finfo(np.float32).tiny,
+                1 / 3,
+                -2.5e-7,
+                12345.678,
+            ],
             dtype=np.float32,
         )
         pos = np.tile(awkward, (4, 1)).reshape(2, 8, 3).astype(np.float32)
@@ -227,9 +237,7 @@ class TestMultiColumn:
         nframes = pos.shape[0]
         cell = np.tile([3.0, 90.0, 3.0, 90.0, 90.0, 3.0], (nframes, 1)).astype(np.float64)
 
-        ct = mdz.compress_batch(
-            pos, velocities=vel, cell=cell, precision=PRECISION
-        )
+        ct = mdz.compress_batch(pos, velocities=vel, cell=cell, precision=PRECISION)
         names = set(ct.column_names)
         assert {"positions", "velocities"} <= names
 
@@ -320,9 +328,7 @@ class TestReaderProtocol:
         cell = np.tile([3.0, 90.0, 3.0, 90.0, 90.0, 3.0], (nframes, 1)).astype(np.float64)
         step = np.arange(nframes, dtype=np.int64) * 5
         names = ["C" if i % 2 == 0 else "H" for i in range(natoms)]
-        ct = mdz.compress_batch(
-            pos, velocities=vel, cell=cell, step=step, atom_names=names, precision=PRECISION
-        )
+        ct = mdz.compress_batch(pos, velocities=vel, cell=cell, step=step, atom_names=names, precision=PRECISION)
         path = str(tmp_path / "reader.mdz")
         ct.save(path)
         return path, pos, vel, step, names
