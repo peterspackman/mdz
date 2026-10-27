@@ -11,11 +11,10 @@ if(MDZ_ZSTD STREQUAL "fetch")
   FetchContent_Declare(mdz_zstd_src
     URL https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
     URL_HASH SHA256=eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3
-    DOWNLOAD_EXTRACT_TIMESTAMP ON)
-  FetchContent_GetProperties(mdz_zstd_src)
-  if(NOT mdz_zstd_src_POPULATED)
-    FetchContent_Populate(mdz_zstd_src)
-  endif()
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+    # No CMakeLists.txt there, so MakeAvailable only downloads the sources.
+    SOURCE_SUBDIR none)
+  FetchContent_MakeAvailable(mdz_zstd_src)
   set(_z ${mdz_zstd_src_SOURCE_DIR}/lib)
   file(GLOB _zstd_sources
     ${_z}/common/*.c
