@@ -6,12 +6,14 @@ name: Release
 #   3. build wheels, the sdist and the CLI binaries;
 #   4. create the GitHub release (binaries + SHA256SUMS);
 #   5. publish to PyPI.
-# Nothing is published unless every earlier step succeeded.
+# Nothing is published unless every earlier step succeeded. Running it by
+# hand (workflow_dispatch) builds and tests everything but publishes nothing.
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,8 +25,9 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Tag matches the project version
+        if: github.ref_type == 'tag'
         id: version
         env:
           TAG: ${{ github.ref_name }}
@@ -58,11 +61,11 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --config Release --parallel
       - run: ctest --test-dir build -C Release --output-on-failure
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Python tests
         run: |
           uv venv --clear
@@ -78,15 +81,15 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-14, windows-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: pypa/cibuildwheel@v2.23.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pypa/cibuildwheel@b9e566a2b284570af229f6c2a33673410d0389a3 # v4.3.4
         env:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
           CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_i686"
           CIBW_TEST_REQUIRES: numpy pytest
           CIBW_TEST_COMMAND: python -m pytest {project}/tests -q
           MACOSX_DEPLOYMENT_TARGET: "10.15"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -96,10 +99,10 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - run: uv build --sdist --out-dir dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sdist
           path: dist/*.tar.gz
@@ -126,7 +129,7 @@ jobs:
     env:
       NAME: ${{ matrix.name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build (Linux, static, in Alpine)
         if: startsWith(matrix.name, 'linux')
         run: |
@@ -164,7 +167,7 @@ jobs:
             echo "ASSET=$dir.tar.gz" >> "$GITHUB_ENV"
           fi
           "$bin" --version
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cli-${{ matrix.name }}
           path: ${{ env.ASSET }}
@@ -172,12 +175,13 @@ jobs:
 
   # --- GitHub Release ---
   github-release:
+    if: github.ref_type == 'tag'
     needs: [check-version, test, wheels, sdist, cli]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           merge-multiple: true
@@ -185,7 +189,7 @@ jobs:
         working-directory: artifacts
         run: |
           sha256sum -- * | tee SHA256SUMS
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           # CLI archives, wheels, the sdist, and SHA256SUMS covering them all.
           files: artifacts/*
@@ -205,16 +209,16 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: wheels-*
           path: dist
           merge-multiple: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: sdist
           path: dist
       - run: ls -l dist
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist
