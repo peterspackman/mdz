@@ -80,8 +80,10 @@ void put_fixed_width(text::TextWriter& w, double v, int prec, int width) {
     if (std::isnan(v)) {
         std::memcpy(b, "NaN", n = 3);
     } else if (std::isinf(v)) {
-        if (v < 0) std::memcpy(b, "-inf", n = 4);
-        else std::memcpy(b, "inf", n = 3);
+        if (v < 0)
+            std::memcpy(b, "-inf", n = 4);
+        else
+            std::memcpy(b, "inf", n = 3);
     } else {
         auto r = std::to_chars(b, b + sizeof b, v, std::chars_format::fixed, prec);
         n = static_cast<std::size_t>(r.ptr - b);
@@ -168,8 +170,8 @@ private:
                     const std::string_view tok = field(line, 30 + 8 * k, 38 + 8 * k);
                     float v;
                     if (!text::parse(tok, v))
-                        corrupt_at(lines_, "bad PDB coordinate '" + std::string(tok) + "' in '" +
-                                               std::string(line) + "'");
+                        corrupt_at(lines_,
+                                   "bad PDB coordinate '" + std::string(tok) + "' in '" + std::string(line) + "'");
                     pos_.push_back(v * ang_to_nm);
                 }
                 occ_.push_back(len >= 60 ? field_or(line, 54, 60, 1.0f) : 1.0f);
@@ -339,7 +341,8 @@ public:
         const std::vector<float>* occ = batch.column("occupancy");
         const std::vector<float>* bfac = batch.column("bfactor");
         const bool use_models = batch.nframes > 1 || model_ > 0 || models_;
-        auto get = [](const auto& shared, std::size_t i) -> const typename std::decay_t<decltype(*shared)>::value_type* {
+        auto get = [](const auto& shared,
+                      std::size_t i) -> const typename std::decay_t<decltype(*shared)>::value_type* {
             return shared && i < shared->size() ? &(*shared)[i] : nullptr;
         };
 
@@ -391,16 +394,17 @@ public:
                 const std::int32_t* rs = get(batch.residue_ids, a);
                 put_int_width(w_, rem_euclid(rs ? *rs : 1, 10000), 4);
                 w_.put("    ");
-                for (int k = 0; k < 3; ++k)
-                    put_fixed_width(w_, static_cast<double>(p[k]) * units::kNmToAngstrom, 3, 8);
+                for (int k = 0; k < 3; ++k) put_fixed_width(w_, static_cast<double>(p[k]) * units::kNmToAngstrom, 3, 8);
                 put_fixed_width(w_, occ && idx < occ->size() ? (*occ)[idx] : 1.0f, 2, 6);
                 put_fixed_width(w_, bfac && idx < bfac->size() ? (*bfac)[idx] : 0.0f, 2, 6);
                 w_.put("          ");
                 // Use the stored element, or guess it from the name.
                 const std::string* el = get(batch.elements, a);
                 std::string_view element;
-                if (el && !el->empty()) element = *el;
-                else element = char_count(name) <= 2 ? name : first_char(name);
+                if (el && !el->empty())
+                    element = *el;
+                else
+                    element = char_count(name) <= 2 ? name : first_char(name);
                 put_aligned(w_, element, 2, false);
                 w_.put('\n');
             }

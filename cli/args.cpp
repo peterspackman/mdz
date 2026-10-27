@@ -104,8 +104,10 @@ std::vector<const char*> headings(const std::vector<Opt>& opts) {
             for (const auto& pos : c->positionals) {
                 std::string label = std::string("  ") + (pos.required ? "<" : "[") + pos.name +
                                     (pos.required ? ">" : "]") + (pos.many ? "..." : "");
-                if (label.size() < 30) label.resize(30, ' ');
-                else label += "\n" + std::string(30, ' ');
+                if (label.size() < 30)
+                    label.resize(30, ' ');
+                else
+                    label += "\n" + std::string(30, ' ');
                 out += label;
                 wrap(out, pos.help, 30);
             }
@@ -193,8 +195,9 @@ Args parse(const Program& p, int argc, char** argv) {
             v = inline_value;
         } else {
             if (i + 1 >= argc)
-                fail_usage(p, a.command, std::string("a value is required for '--") + o.name + " <" + o.value_name +
-                                             ">' but none was supplied");
+                fail_usage(p, a.command,
+                           std::string("a value is required for '--") + o.name + " <" + o.value_name +
+                               ">' but none was supplied");
             v = argv[++i];
         }
         if (!o.choices.empty()) {
@@ -292,8 +295,7 @@ Args parse(const Program& p, int argc, char** argv) {
 
     for (const auto& [x, y] : a.command->conflicts)
         if (a.has(x) && a.has(y))
-            fail_usage(p, a.command,
-                       std::string("the argument '--") + x + "' cannot be used with '--" + y + "'");
+            fail_usage(p, a.command, std::string("the argument '--") + x + "' cannot be used with '--" + y + "'");
     return a;
 }
 
@@ -307,7 +309,8 @@ std::string completion_script(const Program& p, std::string_view shell) {
         return v;
     };
     if (shell == "bash") {
-        out += std::string("_") + p.name + "() {\n  local cur prev cmd\n  cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
+        out += std::string("_") + p.name +
+               "() {\n  local cur prev cmd\n  cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
                "  prev=\"${COMP_WORDS[COMP_CWORD-1]}\"\n  cmd=\"\"\n"
                "  for w in \"${COMP_WORDS[@]:1}\"; do case \"$w\" in";
         for (const auto& c : p.commands) out += std::string(" ") + c.name + (&c == &p.commands.back() ? "" : " |");
@@ -315,7 +318,8 @@ std::string completion_script(const Program& p, std::string_view shell) {
         auto emit = [&](const Command* c) {
             for (const Opt* o : opts_of(c))
                 if (!o->choices.empty()) {
-                    out += std::string("      if [ \"$prev\" = \"--") + o->name + "\" ]; then COMPREPLY=($(compgen -W \"";
+                    out +=
+                        std::string("      if [ \"$prev\" = \"--") + o->name + "\" ]; then COMPREPLY=($(compgen -W \"";
                     for (auto ch : o->choices) out += std::string(ch) + " ";
                     out += "\" -- \"$cur\")); return; fi\n";
                 }
@@ -338,8 +342,9 @@ std::string completion_script(const Program& p, std::string_view shell) {
     } else if (shell == "zsh") {
         out += std::string("#compdef ") + p.name + "\n\n_" + p.name + "() {\n  local -a commands\n  commands=(\n";
         for (const auto& c : p.commands) out += std::string("    '") + c.name + ":" + c.about + "'\n";
-        out += "  )\n  if (( CURRENT == 2 )); then\n    _describe 'command' commands\n    return\n  fi\n"
-               "  case ${words[2]} in\n";
+        out +=
+            "  )\n  if (( CURRENT == 2 )); then\n    _describe 'command' commands\n    return\n  fi\n"
+            "  case ${words[2]} in\n";
         for (const auto& c : p.commands) {
             out += std::string("    ") + c.name + ")\n      _arguments";
             for (const Opt* o : opts_of(&c)) {

@@ -43,7 +43,8 @@ private:
 std::unique_ptr<TrajectoryReader> make_mdz_reader(std::unique_ptr<InputStream> in, const FormatOptions&) {
     std::vector<std::uint8_t> bytes;
     std::vector<std::uint8_t> chunk(1 << 20);
-    while (std::size_t n = in->read(chunk.data(), chunk.size())) bytes.insert(bytes.end(), chunk.begin(), chunk.begin() + static_cast<std::ptrdiff_t>(n));
+    while (std::size_t n = in->read(chunk.data(), chunk.size()))
+        bytes.insert(bytes.end(), chunk.begin(), chunk.begin() + static_cast<std::ptrdiff_t>(n));
     return std::make_unique<MdzFormatReader>(Reader::from_bytes(std::move(bytes)));
 }
 

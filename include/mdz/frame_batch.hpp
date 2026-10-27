@@ -40,11 +40,11 @@ using NamedMap = std::map<std::string, V, std::less<>>;
 // atom count varies (see FrameBatch::make_variable). String-valued fields are
 // stored as indices into FrameBatch::strings.
 namespace columns {
-inline constexpr const char* kId = "mdz.id";          // atom_ids; matches atoms across frames
-inline constexpr const char* kType = "mdz.type";      // atom_types
-inline constexpr const char* kResid = "mdz.resid";    // residue_ids
-inline constexpr const char* kHetatm = "mdz.hetatm";  // hetatm (0/1)
-inline constexpr const char* kName = "mdz.name";      // atom_names
+inline constexpr const char* kId = "mdz.id";            // atom_ids; matches atoms across frames
+inline constexpr const char* kType = "mdz.type";        // atom_types
+inline constexpr const char* kResid = "mdz.resid";      // residue_ids
+inline constexpr const char* kHetatm = "mdz.hetatm";    // hetatm (0/1)
+inline constexpr const char* kName = "mdz.name";        // atom_names
 inline constexpr const char* kElement = "mdz.element";  // elements
 inline constexpr const char* kResname = "mdz.resname";  // residue_names
 inline constexpr const char* kChain = "mdz.chain";      // chain_ids

@@ -23,10 +23,10 @@ std::int32_t reference_round(float y) {
 }  // namespace
 
 TEST(round_matches_reference_on_hard_values) {
-    const float cases[] = {0.0f,         -0.0f,         0.5f,         -0.5f,          1.5f,          -1.5f,
-                           2.5f,         0.49999997f,   -0.49999997f, 8388607.5f,     8388609.0f,    16777217.0f,
-                           2147483520.f, -2147483648.f, 2147483648.f, -2147483904.f,  1e30f,         -1e30f,
-                           INFINITY,     -INFINITY,     NAN,          1.17549435e-38f, 0.50000006f,  -2.5f};
+    const float cases[] = {0.0f,         -0.0f,         0.5f,         -0.5f,           1.5f,        -1.5f,
+                           2.5f,         0.49999997f,   -0.49999997f, 8388607.5f,      8388609.0f,  16777217.0f,
+                           2147483520.f, -2147483648.f, 2147483648.f, -2147483904.f,   1e30f,       -1e30f,
+                           INFINITY,     -INFINITY,     NAN,          1.17549435e-38f, 0.50000006f, -2.5f};
     for (float y : cases) CHECK_EQ(round_to_i32(y), reference_round(y));
 }
 

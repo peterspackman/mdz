@@ -12,10 +12,10 @@
 namespace cli {
 
 struct Opt {
-    const char* name;            // long name, without "--"
-    char short_name;             // 0 for none
-    const char* value_name;      // nullptr for a flag
-    const char* help;            // first line is the short help
+    const char* name;               // long name, without "--"
+    char short_name;                // 0 for none
+    const char* value_name;         // nullptr for a flag
+    const char* help;               // first line is the short help
     const char* heading = nullptr;  // help section; nullptr = "Options"
     const char* default_text = nullptr;
     std::vector<const char*> choices = {};  // allowed values, if a closed set

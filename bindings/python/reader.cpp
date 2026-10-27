@@ -60,8 +60,8 @@ std::size_t normalize_index(std::int64_t i, std::size_t n) {
     const std::int64_t ni = static_cast<std::int64_t>(n);
     const std::int64_t j = i < 0 ? i + ni : i;
     if (j < 0 || j >= ni)
-        raise(PyExc_IndexError, "frame index " + std::to_string(i) + " out of range for " + std::to_string(n) +
-                                    " frames");
+        raise(PyExc_IndexError,
+              "frame index " + std::to_string(i) + " out of range for " + std::to_string(n) + " frames");
     return static_cast<std::size_t>(j);
 }
 
@@ -222,8 +222,9 @@ void bind_reader(nb::module_& m) {
         .def("__length_hint__", [](const ReaderIter& it) { return it.n > it.idx ? it.n - it.idx : 0; });
 
     nb::class_<PyReader>(m, "MdzReader", kReaderDoc)
-        .def_prop_ro("natoms", [](const PyReader& p) { return p.r.natoms(); },
-                     "Atoms per frame, or 0 if the count varies (see ``variable_atoms``).")
+        .def_prop_ro(
+            "natoms", [](const PyReader& p) { return p.r.natoms(); },
+            "Atoms per frame, or 0 if the count varies (see ``variable_atoms``).")
         .def_prop_ro("nframes", [](const PyReader& p) { return p.r.nframes(); })
         .def_prop_ro(
             "variable_atoms", [](const PyReader& p) { return p.r.variable_atoms(); },
@@ -269,8 +270,7 @@ void bind_reader(nb::module_& m) {
                     if (PySlice_Unpack(key.ptr(), &start, &stop, &step) < 0) throw nb::python_error();
                     const Py_ssize_t len = PySlice_AdjustIndices(static_cast<Py_ssize_t>(n), &start, &stop, step);
                     if (step == 1)
-                        return read_range(p.r, static_cast<std::size_t>(start),
-                                          static_cast<std::size_t>(start + len));
+                        return read_range(p.r, static_cast<std::size_t>(start), static_cast<std::size_t>(start + len));
                     return read_strided(p.r, start, step, len);
                 }
                 // An integer, or anything with __index__. Negative values count

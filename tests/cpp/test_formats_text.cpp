@@ -18,7 +18,8 @@ using mdz::FrameBatch;
 std::vector<std::uint8_t> bytes_of(std::string_view s) { return std::vector<std::uint8_t>(s.begin(), s.end()); }
 
 FrameBatch read_text(std::string_view format, std::string_view text, const mdz::FormatOptions& opts = {}) {
-    auto r = mdz::find_format(format)->open_reader(mdz::memory_input(bytes_of(text), "test." + std::string(format)), opts);
+    auto r =
+        mdz::find_format(format)->open_reader(mdz::memory_input(bytes_of(text), "test." + std::string(format)), opts);
     auto b = r->read_all();
     REQUIRE(b.has_value());
     return std::move(*b);
@@ -27,8 +28,8 @@ FrameBatch read_text(std::string_view format, std::string_view text, const mdz::
 std::string write_text(std::string_view format, const std::vector<const FrameBatch*>& batches,
                        const mdz::FormatOptions& opts = {}) {
     std::vector<std::uint8_t> out;
-    auto w = mdz::find_format(format)->open_writer(mdz::memory_output(&out), batches.empty() ? 0 : batches[0]->natoms,
-                                                   opts);
+    auto w =
+        mdz::find_format(format)->open_writer(mdz::memory_output(&out), batches.empty() ? 0 : batches[0]->natoms, opts);
     for (const FrameBatch* b : batches) w->write_batch(*b);
     w->finish();
     return std::string(out.begin(), out.end());
@@ -60,10 +61,10 @@ void check_same_text(const std::string& got, const std::string& want, const char
         if (!a || !b || lg != lw) break;
         ++line;
     }
-    mdz_test::fail(__FILE__, __LINE__,
-                   std::string(what) + ": differs at line " + std::to_string(line) + ":\n  got:  " + lg +
-                       "\n  want: " + lw,
-                   false);
+    mdz_test::fail(
+        __FILE__, __LINE__,
+        std::string(what) + ": differs at line " + std::to_string(line) + ":\n  got:  " + lg + "\n  want: " + lw,
+        false);
 }
 
 mdz::Shared<std::string> strs(std::vector<std::string> v) { return mdz::share(std::move(v)); }
@@ -191,7 +192,8 @@ TEST(extxyz_roundtrip) {
     auto back = read_text("extxyz", text);
     CHECK_EQ(back.natoms, std::size_t(3));
     CHECK_EQ(back.nframes, std::size_t(2));
-    for (std::size_t i = 0; i < 18; ++i) CHECK(std::fabs(back.columns["positions"][i] - b.columns["positions"][i]) < 1e-4f);
+    for (std::size_t i = 0; i < 18; ++i)
+        CHECK(std::fabs(back.columns["positions"][i] - b.columns["positions"][i]) < 1e-4f);
     REQUIRE(back.box.has_value());
     CHECK_EQ(back.box->size(), std::size_t(2));
     CHECK(near((*back.cell_params())[0][0], 3.0, 0.01));
@@ -224,7 +226,8 @@ TEST(pdb_roundtrip) {
     auto back = read_text("pdb", write_text("pdb", b));
     CHECK_EQ(back.natoms, std::size_t(3));
     CHECK_EQ(back.nframes, std::size_t(2));
-    for (std::size_t i = 0; i < 18; ++i) CHECK(std::fabs(back.columns["positions"][i] - b.columns["positions"][i]) < 1e-3f);
+    for (std::size_t i = 0; i < 18; ++i)
+        CHECK(std::fabs(back.columns["positions"][i] - b.columns["positions"][i]) < 1e-3f);
     REQUIRE(back.atom_names);
     CHECK(*back.atom_names == (std::vector<std::string>{"O", "H", "H"}));
     REQUIRE(back.box.has_value());
@@ -317,14 +320,16 @@ TEST(pdb_reader_details) {
     // A record without coordinates is malformed.
     CHECK_THROWS(read_text("pdb", "ATOM      1  O   WAT A   1       1.000   2.000\n"));
     // MODEL/ENDMDL frames. A change in atom count makes the batch variable.
-    const char* two = "MODEL        1\nATOM      1  O   WAT A   1       1.000   2.000   3.000\nENDMDL\n"
-                      "MODEL        2\nATOM      1  O   WAT A   1       1.500   2.000   3.000\nENDMDL\nEND\n";
+    const char* two =
+        "MODEL        1\nATOM      1  O   WAT A   1       1.000   2.000   3.000\nENDMDL\n"
+        "MODEL        2\nATOM      1  O   WAT A   1       1.500   2.000   3.000\nENDMDL\nEND\n";
     b = read_text("pdb", two);
     CHECK_EQ(b.nframes, std::size_t(2));
     CHECK(b.columns["positions"][3] == 1.5f * 0.1f);
-    b = read_text("pdb", "MODEL        1\nATOM      1  O   WAT A   1       1.000   2.000   3.000\nENDMDL\n"
-                         "MODEL        2\nATOM      1  O   WAT A   1       1.500   2.000   3.000\n"
-                         "ATOM      2  O   WAT A   1       1.500   2.000   3.000\nENDMDL\n");
+    b = read_text("pdb",
+                  "MODEL        1\nATOM      1  O   WAT A   1       1.000   2.000   3.000\nENDMDL\n"
+                  "MODEL        2\nATOM      1  O   WAT A   1       1.500   2.000   3.000\n"
+                  "ATOM      2  O   WAT A   1       1.500   2.000   3.000\nENDMDL\n");
     CHECK(b.variable());
     CHECK(*b.frame_natoms == (std::vector<std::size_t>{1, 2}));
 }
@@ -429,15 +434,17 @@ TEST(lammps_dump_round_trips_through_reader_and_writer) {
         const auto& x = again.columns[key];
         const auto& y = b.columns[key];
         REQUIRE(x.size() == y.size());
-        for (std::size_t i = 0; i < x.size(); ++i) CHECK(std::fabs(x[i] - y[i]) <= 1e-6f * std::max(std::fabs(y[i]), 1.0f));
+        for (std::size_t i = 0; i < x.size(); ++i)
+            CHECK(std::fabs(x[i] - y[i]) <= 1e-6f * std::max(std::fabs(y[i]), 1.0f));
     }
     CHECK(again.int_columns == b.int_columns);
     CHECK(again.attributes == b.attributes);
 }
 
 TEST(lammps_scaled_coordinates_and_general_boxes) {
-    const char* text = "ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n1\nITEM: BOX BOUNDS abc origin pp pp pp\n"
-                       "10 0 0 1\n1 10 0 2\n0 1 10 3\nITEM: ATOMS id type xs ys zs\n1 1 0.5 0.5 0.5\n";
+    const char* text =
+        "ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n1\nITEM: BOX BOUNDS abc origin pp pp pp\n"
+        "10 0 0 1\n1 10 0 2\n0 1 10 3\nITEM: ATOMS id type xs ys zs\n1 1 0.5 0.5 0.5\n";
     FrameBatch b = read_lammps(text, "metal");
     FrameBatch internal = b.in_internal_units();
     const auto& p = internal.columns["positions"];
@@ -456,8 +463,9 @@ TEST(lammps_orthogonal_boxes_keep_their_origin) {
 
 TEST(lammps_changing_atoms_make_the_batch_vary) {
     auto frame = [](const char* ids, const char* ty) {
-        return std::string("ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n2\nITEM: BOX BOUNDS pp pp pp\n0 1\n0 1\n0 1\n"
-                           "ITEM: ATOMS id type x y z\n") +
+        return std::string(
+                   "ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n2\nITEM: BOX BOUNDS pp pp pp\n0 1\n0 1\n0 1\n"
+                   "ITEM: ATOMS id type x y z\n") +
                ids[0] + " " + ty + " 0 0 0\n" + ids[1] + " 1 0 0 0\n";
     };
     // Different ids or changed types mean different atoms, even at the same
@@ -583,12 +591,14 @@ namespace {
 
 std::vector<float> ramp(int n, float scale, float offset, bool divide = false) {
     std::vector<float> v(static_cast<std::size_t>(n));
-    for (int i = 0; i < n; ++i) v[static_cast<std::size_t>(i)] = divide ? static_cast<float>(i) / scale : static_cast<float>(i) * scale + offset;
+    for (int i = 0; i < n; ++i)
+        v[static_cast<std::size_t>(i)] =
+            divide ? static_cast<float>(i) / scale : static_cast<float>(i) * scale + offset;
     return v;
 }
 
-const std::vector<float> kPos18 = {0.1f,  -0.2f, 0.3f,  1.2345678f, 0.0f, -0.0000004f, 12.5f, -7.25f, 0.333333f,
-                                   0.11f, 0.21f, 0.31f, 0.41f,      0.51f, 0.61f,      0.71f, 0.81f,  0.91f};
+const std::vector<float> kPos18 = {0.1f,  -0.2f, 0.3f,  1.2345678f, 0.0f,  -0.0000004f, 12.5f, -7.25f, 0.333333f,
+                                   0.11f, 0.21f, 0.31f, 0.41f,      0.51f, 0.61f,       0.71f, 0.81f,  0.91f};
 
 mdz::Box diag(double a, double b, double c) { return {a, 0, 0, 0, b, 0, 0, 0, c}; }
 
@@ -612,8 +622,8 @@ FrameBatch batch_ext() {
 
 FrameBatch batch_internal() {
     FrameBatch b(3, 2);
-    b.columns["positions"] = {0.1f,  -0.2f, 0.3f,  1.2345678f, 0.0f, -0.0000004f, 2.5f,  -1.25f, 0.333333f,
-                              0.11f, 0.21f, 0.31f, 0.41f,      0.51f, 0.61f,      0.71f, 0.81f,  0.91f};
+    b.columns["positions"] = {0.1f,  -0.2f, 0.3f,  1.2345678f, 0.0f,  -0.0000004f, 2.5f,  -1.25f, 0.333333f,
+                              0.11f, 0.21f, 0.31f, 0.41f,      0.51f, 0.61f,       0.71f, 0.81f,  0.91f};
     b.columns["velocities"] = ramp(18, 0.37f, -2.0f);
     b.columns["forces"] = ramp(18, -13.1f, 50.0f);
     b.columns["charge"] = {-0.8f, 0.4f, 0.4f, -0.81f, 0.405f, 0.405f};
@@ -659,8 +669,9 @@ TEST(extxyz_writer_matches_reference) {
 
 TEST(pdb_writer_matches_reference) {
     FrameBatch b(4, 2);
-    b.columns["positions"] = {0.1f,  0.2f,  0.3f,  -0.4f, 0.5f,  0.6f,  12.34567f, -99.9999f, 0.0f, 0.7f, 0.8f, 0.9f,
-                              0.11f, 0.21f, 0.31f, -0.41f, 0.51f, 0.61f, 1.0f,      2.0f,      3.0f, 0.71f, 0.81f, 0.91f};
+    b.columns["positions"] = {0.1f,  0.2f,  0.3f, -0.4f, 0.5f,  0.6f,  12.34567f, -99.9999f,
+                              0.0f,  0.7f,  0.8f, 0.9f,  0.11f, 0.21f, 0.31f,     -0.41f,
+                              0.51f, 0.61f, 1.0f, 2.0f,  3.0f,  0.71f, 0.81f,     0.91f};
     b.columns["occupancy"] = {1.0f, 0.5f, 0.25f, 0.125f, 1.0f, 0.5f, 0.25f};
     b.columns["bfactor"] = {10.0f, 20.5f, 30.25f, 99.99f, 1.0f, 2.0f, 3.0f, 4.0f};
     b.atom_names = strs({"N", "CA", "HD21", "\xC3\x84"});
@@ -721,8 +732,9 @@ TEST(lammps_writer_matches_reference) {
 }
 
 TEST(lammps_sorting_and_numbers) {
-    const std::string head = "ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n4\nITEM: BOX BOUNDS pp pp pp\n0 1\n0 1\n0 1\n"
-                             "ITEM: ATOMS id x y z q mol\n";
+    const std::string head =
+        "ITEM: TIMESTEP\n0\nITEM: NUMBER OF ATOMS\n4\nITEM: BOX BOUNDS pp pp pp\n0 1\n0 1\n0 1\n"
+        "ITEM: ATOMS id x y z q mol\n";
     // Sparse ids with a repeat. Atoms are sorted by id, equal ids stay in
     // input order, and the other columns move with their atoms.
     FrameBatch b = read_text("lammps", head + "5 1 0 0 0.5 1\n3 2 0 0 0.25 2\n9 3 0 0 0.75 3\n3 4 0 0 0.125 4\n");
@@ -733,7 +745,8 @@ TEST(lammps_sorting_and_numbers) {
     // Dense ids out of order.
     b = read_text("lammps", head + "2 2 0 0 0 0\n4 4 0 0 0 0\n1 1 0 0 0 0\n3 3 0 0 0 0\n");
     CHECK(*b.atom_ids == (std::vector<std::int32_t>{1, 2, 3, 4}));
-    for (int i = 0; i < 4; ++i) CHECK(b.columns["positions"][static_cast<std::size_t>(3 * i)] == static_cast<float>(i + 1));
+    for (int i = 0; i < 4; ++i)
+        CHECK(b.columns["positions"][static_cast<std::size_t>(3 * i)] == static_cast<float>(i + 1));
     // The number parser accepts a leading '+', inf and nan, and out-of-range
     // values (which overflow to inf or underflow to zero).
     b = read_text("lammps", head + "+1 1e400 -1e-400 +2 nan +3\n2 inf -inf 0 1e50 -0\n3 0 0 0 0 0\n4 0 0 0 0 0\n");

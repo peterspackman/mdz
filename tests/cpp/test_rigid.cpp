@@ -15,9 +15,9 @@ using Vec = std::array<double, 3>;
 // Rotate v by the unit quaternion q (w, x, y, z).
 Vec rotate(const std::array<double, 4>& q, const Vec& v) {
     const double w = q[0], x = q[1], y = q[2], z = q[3];
-    const double m[9] = {1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y),
-                         2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x),
-                         2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)};
+    const double m[9] = {1 - 2 * (y * y + z * z), 2 * (x * y - w * z),     2 * (x * z + w * y),
+                         2 * (x * y + w * z),     1 - 2 * (x * x + z * z), 2 * (y * z - w * x),
+                         2 * (x * z - w * y),     2 * (y * z + w * x),     1 - 2 * (x * x + y * y)};
     return {m[0] * v[0] + m[1] * v[1] + m[2] * v[2], m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
             m[6] * v[0] + m[7] * v[1] + m[8] * v[2]};
 }
@@ -55,8 +55,8 @@ mdz::FrameBatch molecules(const std::vector<Vec>& shape, std::size_t nmol, std::
     for (std::size_t f = 0; f < nframes; ++f) {
         for (std::size_t m = 0; m < nmol; ++m) {
             for (int d = 0; d < 3; ++d) centre[m][d] += step * 0.05 * g(rng);
-            q[m] = normalize({q[m][0] + step * g(rng), q[m][1] + step * g(rng), q[m][2] + step * g(rng),
-                              q[m][3] + step * g(rng)});
+            q[m] = normalize(
+                {q[m][0] + step * g(rng), q[m][1] + step * g(rng), q[m][2] + step * g(rng), q[m][3] + step * g(rng)});
             for (const Vec& s : shape) {
                 Vec r = rotate(q[m], s);
                 for (int d = 0; d < 3; ++d) pos.push_back(float(centre[m][d] + r[d] + flex * g(rng)));

@@ -24,12 +24,18 @@ std::size_t dtype_size(Dtype d) noexcept {
 
 std::string_view dtype_name(Dtype d) noexcept {
     switch (d) {
-        case Dtype::F32: return "f32";
-        case Dtype::F64: return "f64";
-        case Dtype::I32: return "i32";
-        case Dtype::U32: return "u32";
-        case Dtype::U8: return "u8";
-        case Dtype::I64: return "i64";
+        case Dtype::F32:
+            return "f32";
+        case Dtype::F64:
+            return "f64";
+        case Dtype::I32:
+            return "i32";
+        case Dtype::U32:
+            return "u32";
+        case Dtype::U8:
+            return "u8";
+        case Dtype::I64:
+            return "i64";
     }
     return "?";
 }
@@ -94,8 +100,10 @@ GofTable::Span GofTable::overlapping(std::size_t start, std::size_t end) const n
     start = std::min(start, nframes_);
     end = std::min(end, nframes_);
     if (start >= end) return {0, 0};
-    std::size_t first = static_cast<std::size_t>(std::upper_bound(starts_.begin(), starts_.end(), start) - starts_.begin()) - 1;
-    std::size_t last = static_cast<std::size_t>(std::lower_bound(starts_.begin(), starts_.end(), end) - starts_.begin());
+    std::size_t first =
+        static_cast<std::size_t>(std::upper_bound(starts_.begin(), starts_.end(), start) - starts_.begin()) - 1;
+    std::size_t last =
+        static_cast<std::size_t>(std::lower_bound(starts_.begin(), starts_.end(), end) - starts_.begin());
     return {first, last};
 }
 

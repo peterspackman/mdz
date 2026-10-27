@@ -73,9 +73,9 @@ public:
                              "raw float32 holds one atom count per file and cannot store frames whose atom count "
                              "varies; write xtc, extxyz, xyz, pdb or a LAMMPS dump instead");
         if (natoms_ && b.natoms != *natoms_)
-            throw mdz::Error(mdz::ErrorKind::InvalidInput, "raw float32 holds one atom count per file: this batch has " +
-                                                               std::to_string(b.natoms) + " atoms per frame, the file " +
-                                                               std::to_string(*natoms_));
+            throw mdz::Error(mdz::ErrorKind::InvalidInput,
+                             "raw float32 holds one atom count per file: this batch has " + std::to_string(b.natoms) +
+                                 " atoms per frame, the file " + std::to_string(*natoms_));
         natoms_ = b.natoms;
         if (b.units) {
             write_batch(b.in_internal_units());
@@ -174,14 +174,22 @@ const char* format_name(OutFormat f) { return f == OutFormat::Raw ? "raw" : form
 
 const char* format_ext(OutFormat f) {
     switch (f) {
-        case OutFormat::Extxyz: return "extxyz";
-        case OutFormat::Xyz: return "xyz";
-        case OutFormat::Pdb: return "pdb";
-        case OutFormat::Lammpstrj: return "lammpstrj";
-        case OutFormat::Dcd: return "dcd";
-        case OutFormat::Xtc: return "xtc";
-        case OutFormat::Npy: return "npy";
-        case OutFormat::Raw: return "f32";
+        case OutFormat::Extxyz:
+            return "extxyz";
+        case OutFormat::Xyz:
+            return "xyz";
+        case OutFormat::Pdb:
+            return "pdb";
+        case OutFormat::Lammpstrj:
+            return "lammpstrj";
+        case OutFormat::Dcd:
+            return "dcd";
+        case OutFormat::Xtc:
+            return "xtc";
+        case OutFormat::Npy:
+            return "npy";
+        case OutFormat::Raw:
+            return "f32";
     }
     return "";
 }
@@ -213,12 +221,15 @@ Output Output::resolve(const std::string& path, std::optional<OutFormat> format)
     if (format && from_ext && *format != *from_ext)
         warn(std::string("writing ") + format_name(*format) + " to '" + path + "', whose extension says " +
              format_name(*from_ext));
-    if (format) o.format = *format;
-    else if (from_ext) o.format = *from_ext;
-    else if (e == "mdz") fail("cannot write .mdz to '" + path + "' here; use `mdz compress` or `mdz convert`");
+    if (format)
+        o.format = *format;
+    else if (from_ext)
+        o.format = *from_ext;
+    else if (e == "mdz")
+        fail("cannot write .mdz to '" + path + "' here; use `mdz compress` or `mdz convert`");
     else
-        fail("cannot tell the output format of '" + path + "': " +
-             (e.empty() ? std::string("it has no extension") : "." + e + " is not a format mdz writes") +
+        fail("cannot tell the output format of '" + path +
+             "': " + (e.empty() ? std::string("it has no extension") : "." + e + " is not a format mdz writes") +
              ".\n       Use one of " + kOutputExtensions + ", or pass --format");
     o.path = path;
     return o;
@@ -331,8 +342,10 @@ std::size_t write_batches(const Output& out, const std::function<std::optional<m
         writer->finish();
     };
     try {
-        if (out.to_stdout) run(mdz::open_output("-"));
-        else write_atomically(out.path, [&](const std::string& tmp) { run(mdz::open_output(tmp)); });
+        if (out.to_stdout)
+            run(mdz::open_output("-"));
+        else
+            write_atomically(out.path, [&](const std::string& tmp) { run(mdz::open_output(tmp)); });
     } catch (const mdz::Error& e) {
         if (out.to_stdout && is_broken_pipe(e.what())) std::exit(0);
         fail("writing " + out.display() + ": " + e.what());

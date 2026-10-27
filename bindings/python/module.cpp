@@ -20,12 +20,11 @@ namespace fs = std::filesystem;
 // --- compress / decompress ---
 
 PyTrajectory compress_fn(nb::handle positions, nb::handle boxes, float precision, std::int64_t gof_size,
-                         std::int64_t predictor_order, std::int64_t zstd_level, bool adaptive,
-                         std::int64_t anchor_step, const std::string& codec, bool lossless, bool rigid,
-                         nb::handle bodies) {
+                         std::int64_t predictor_order, std::int64_t zstd_level, bool adaptive, std::int64_t anchor_step,
+                         const std::string& codec, bool lossless, bool rigid, nb::handle bodies) {
     const CodecMode mode = parse_codec_mode(codec);
-    CompressOptions opts = make_options(precision, gof_size, predictor_order, zstd_level, adaptive, anchor_step,
-                                        lossless);
+    CompressOptions opts =
+        make_options(precision, gof_size, predictor_order, zstd_level, adaptive, anchor_step, lossless);
     opts.codec = mode;
     Shared<std::int32_t> body_of = bodies_from(bodies);
     opts.rigid = rigid || body_of;
@@ -42,8 +41,8 @@ PyTrajectory compress_fn(nb::handle positions, nb::handle boxes, float precision
         // Rigid bodies need the batch API. compress_positions writes the same
         // columns but cannot take the body assignments.
         if (body_of && body_of->size() != natoms)
-            value_error("bodies has length " + std::to_string(body_of->size()) + ", expected natoms = " +
-                        std::to_string(natoms));
+            value_error("bodies has length " + std::to_string(body_of->size()) +
+                        ", expected natoms = " + std::to_string(natoms));
         FrameBatch batch(natoms, nframes);
         batch.columns.emplace("positions", pos.to_vector());
         batch.box = std::move(box);
@@ -86,8 +85,8 @@ PyTrajectory compress_batch_fn(nb::handle positions, nb::handle velocities, nb::
                                nb::handle column_precision, std::int64_t gof_size, std::int64_t predictor_order,
                                std::int64_t zstd_level, bool adaptive, std::int64_t anchor_step, bool lossless,
                                nb::handle boxes, bool rigid, nb::handle bodies) {
-    CompressOptions opts = make_options(precision, gof_size, predictor_order, zstd_level, adaptive, anchor_step,
-                                        lossless);
+    CompressOptions opts =
+        make_options(precision, gof_size, predictor_order, zstd_level, adaptive, anchor_step, lossless);
     add_column_precision(opts, column_precision);
     opts.rigid = rigid || !bodies.is_none();
     PyTrajectory t;
@@ -183,8 +182,8 @@ void convert_fn(const fs::path& input, const fs::path& output, bool overwrite) {
     if (std::find(std::begin(kWritable), std::end(kWritable), out_fmt) == std::end(kWritable)) {
         std::string list;
         for (const char* f : kWritable) list += (list.empty() ? "." : ", .") + std::string(f);
-        value_error("unsupported output format '" + (out_fmt.empty() ? std::string("unknown") : out_fmt) +
-                    "' for " + out + " (expected one of: " + list + ")");
+        value_error("unsupported output format '" + (out_fmt.empty() ? std::string("unknown") : out_fmt) + "' for " +
+                    out + " (expected one of: " + list + ")");
     }
 
     std::optional<FrameBatch> batch = nogil([&] { return as_os_error([&] { return open_reader(in)->read_all(); }); });
@@ -362,8 +361,9 @@ void bind_trajectory(nb::module_& m) {
                              "metadata.\n\n"
                              "Returned by :func:`compress`, :func:`compress_batch` and :func:`load`.\n"
                              "Write it to a file with :meth:`save`.")
-        .def_prop_ro("natoms", [](const PyTrajectory& t) { return t.ct.natoms; },
-                     "Atoms per frame, or 0 if the count varies (see ``variable_atoms``).")
+        .def_prop_ro(
+            "natoms", [](const PyTrajectory& t) { return t.ct.natoms; },
+            "Atoms per frame, or 0 if the count varies (see ``variable_atoms``).")
         .def_prop_ro("nframes", [](const PyTrajectory& t) { return t.ct.nframes; })
         .def_prop_ro(
             "variable_atoms", [](const PyTrajectory& t) { return t.ct.variable_atoms; },
@@ -417,12 +417,24 @@ void bind_trajectory(nb::module_& m) {
                     d["name"] = c.desc.name;
                     const char* dt = "F32";
                     switch (c.desc.dtype) {
-                        case Dtype::F32: dt = "F32"; break;
-                        case Dtype::F64: dt = "F64"; break;
-                        case Dtype::I32: dt = "I32"; break;
-                        case Dtype::U32: dt = "U32"; break;
-                        case Dtype::U8: dt = "U8"; break;
-                        case Dtype::I64: dt = "I64"; break;
+                        case Dtype::F32:
+                            dt = "F32";
+                            break;
+                        case Dtype::F64:
+                            dt = "F64";
+                            break;
+                        case Dtype::I32:
+                            dt = "I32";
+                            break;
+                        case Dtype::U32:
+                            dt = "U32";
+                            break;
+                        case Dtype::U8:
+                            dt = "U8";
+                            break;
+                        case Dtype::I64:
+                            dt = "I64";
+                            break;
                     }
                     d["dtype"] = dt;
                     d["width"] = c.desc.width;
@@ -466,26 +478,26 @@ void bind_trajectory(nb::module_& m) {
 void bind_functions(nb::module_& m) {
     m.def("compress", &compress_fn, "positions"_a, "boxes"_a = nb::none(), "precision"_a = kDefaultPrecision,
           "gof_size"_a = kDefaultGofSize, "predictor_order"_a = 0, "zstd_level"_a = 3, "adaptive"_a = true,
-          "anchor_step"_a = 1, "codec"_a = "auto", "lossless"_a = false, "rigid"_a = false,
-          "bodies"_a = nb::none(), kCompressDoc);
+          "anchor_step"_a = 1, "codec"_a = "auto", "lossless"_a = false, "rigid"_a = false, "bodies"_a = nb::none(),
+          kCompressDoc);
     m.def("decompress", &decompress_fn, "ct"_a, kDecompressDoc);
     m.def("compress_batch", &compress_batch_fn, "positions"_a, "velocities"_a = nb::none(), "forces"_a = nb::none(),
           "charge"_a = nb::none(), "cell"_a = nb::none(), "time"_a = nb::none(), "energy"_a = nb::none(),
-          "step"_a = nb::none(), "atom_names"_a = nb::none(), "atom_types"_a = nb::none(),
-          "atom_ids"_a = nb::none(), "precision"_a = kDefaultPrecision, "column_precision"_a = nb::none(),
-          "gof_size"_a = kDefaultGofSize, "predictor_order"_a = 0, "zstd_level"_a = 3, "adaptive"_a = true,
-          "anchor_step"_a = 1, "lossless"_a = false, "boxes"_a = nb::none(), "rigid"_a = false,
-          "bodies"_a = nb::none(), kCompressBatchDoc);
-    m.def("save", &save_fn, "path"_a, "ct"_a, "Save a compressed trajectory to a .mdz file. Returns the bytes written.");
+          "step"_a = nb::none(), "atom_names"_a = nb::none(), "atom_types"_a = nb::none(), "atom_ids"_a = nb::none(),
+          "precision"_a = kDefaultPrecision, "column_precision"_a = nb::none(), "gof_size"_a = kDefaultGofSize,
+          "predictor_order"_a = 0, "zstd_level"_a = 3, "adaptive"_a = true, "anchor_step"_a = 1, "lossless"_a = false,
+          "boxes"_a = nb::none(), "rigid"_a = false, "bodies"_a = nb::none(), kCompressBatchDoc);
+    m.def("save", &save_fn, "path"_a, "ct"_a,
+          "Save a compressed trajectory to a .mdz file. Returns the bytes written.");
     m.def("load", &load_fn, "path"_a, "Load a compressed trajectory from a .mdz file.");
     m.def("decode_boxes", &decode_boxes_fn, "path"_a, kDecodeBoxesDoc);
-    m.def("info", &info_fn, "path"_a, "Summary of a .mdz file as a dict with keys version, natoms (0 if the\n"
+    m.def("info", &info_fn, "path"_a,
+          "Summary of a .mdz file as a dict with keys version, natoms (0 if the\n"
           "count varies), nframes, gof_size, n_columns, columns, compressed_size,\n"
           "variable_atoms (bool) and rigid_bodies (number of bodies recorded in\n"
           "the metadata).");
     m.def("convert", &convert_fn, "input"_a, "output"_a, "overwrite"_a = false, kConvertDoc);
-    m.def(
-        "set_num_threads", [](unsigned n) { set_num_threads(n); }, "n"_a, kSetThreadsDoc);
+    m.def("set_num_threads", [](unsigned n) { set_num_threads(n); }, "n"_a, kSetThreadsDoc);
 }
 
 }  // namespace mdz::py

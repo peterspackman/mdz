@@ -141,8 +141,7 @@ private:
     void read_header() {
         const std::string& name = in_->name();
         std::uint8_t pre[12];
-        if (read_full(*in_, pre, 10) != 10 || std::memcmp(pre, "\x93NUMPY", 6) != 0)
-            bad(name, "not a valid .npy file");
+        if (read_full(*in_, pre, 10) != 10 || std::memcmp(pre, "\x93NUMPY", 6) != 0) bad(name, "not a valid .npy file");
         std::size_t len;
         if (pre[6] == 1) {
             len = load_le<std::uint16_t>(pre + 8);
@@ -228,7 +227,8 @@ private:
 // 64-byte boundary and to at least min_total bytes, which must be a multiple
 // of 64.
 Bytes npy_header(std::size_t nframes, std::size_t natoms, std::size_t min_total = 0) {
-    std::string dict = "{'descr': '<f4', 'fortran_order': False, 'shape': " + shape_string({nframes, natoms, 3}) + ", }";
+    std::string dict =
+        "{'descr': '<f4', 'fortran_order': False, 'shape': " + shape_string({nframes, natoms, 3}) + ", }";
     std::size_t total = 10 + dict.size() + 1;
     total += (64 - total % 64) % 64;
     total = std::max(total, min_total);
@@ -260,8 +260,9 @@ public:
         if (finished_) throw Error(ErrorKind::InvalidInput, "npy writer is already finished");
         // The header holds a single atom count for the whole file.
         if (batch.variable())
-            throw Error(ErrorKind::InvalidInput, "npy holds one atom count per file and cannot store frames whose atom "
-                                                 "count varies; write xtc, extxyz, xyz, pdb or a LAMMPS dump instead");
+            throw Error(ErrorKind::InvalidInput,
+                        "npy holds one atom count per file and cannot store frames whose atom "
+                        "count varies; write xtc, extxyz, xyz, pdb or a LAMMPS dump instead");
         if (started_ && batch.natoms != natoms_)
             throw Error(ErrorKind::InvalidInput, "npy holds one atom count per file: this batch has " +
                                                      std::to_string(batch.natoms) + " atoms per frame, the file " +
@@ -286,8 +287,10 @@ public:
             }
             started_ = true;
         }
-        if (seekable_) out_->write(pos->data(), pos->size() * 4);
-        else buf_.insert(buf_.end(), pos->begin(), pos->end());
+        if (seekable_)
+            out_->write(pos->data(), pos->size() * 4);
+        else
+            buf_.insert(buf_.end(), pos->begin(), pos->end());
         nframes_ += b->nframes;
     }
 

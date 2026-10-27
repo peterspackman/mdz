@@ -92,7 +92,8 @@ Triad pick_triad(const float* ref, std::size_t cnt) {
     Triad t;
     auto d2 = [&](std::size_t i, std::size_t j) {
         double s = 0;
-        for (int d = 0; d < 3; ++d) s += double(ref[3 * i + d] - ref[3 * j + d]) * double(ref[3 * i + d] - ref[3 * j + d]);
+        for (int d = 0; d < 3; ++d)
+            s += double(ref[3 * i + d] - ref[3 * j + d]) * double(ref[3 * i + d] - ref[3 * j + d]);
         return s;
     };
     for (std::size_t i = 1; i < cnt; ++i)
@@ -485,8 +486,10 @@ std::vector<std::int32_t> detect_rigid_bodies(const FrameBatch& b, double bond, 
                     for (int d = 0; d < 3; ++d) {
                         // Wrap across a periodic box. Without one, stop at the edge.
                         if (c[d] < 0 || c[d] >= nc[d]) {
-                            if (L[d] > 0) c[d] = (c[d] + nc[d]) % nc[d];
-                            else ok = false;
+                            if (L[d] > 0)
+                                c[d] = (c[d] + nc[d]) % nc[d];
+                            else
+                                ok = false;
                         }
                     }
                     if (!ok) continue;
@@ -499,7 +502,8 @@ std::vector<std::int32_t> detect_rigid_bodies(const FrameBatch& b, double bond, 
 
     // Keep the clusters that stay rigid in up to eight sampled frames.
     std::vector<std::size_t> sample;
-    for (std::size_t k = 1; k <= 8 && k < nframes; ++k) sample.push_back(k * (nframes - 1) / std::min<std::size_t>(8, nframes - 1));
+    for (std::size_t k = 1; k <= 8 && k < nframes; ++k)
+        sample.push_back(k * (nframes - 1) / std::min<std::size_t>(8, nframes - 1));
     std::int32_t next = 0;
     for (const auto& cl : clusters) {
         if (cl.size() < 2 || cl.size() > max_body) continue;

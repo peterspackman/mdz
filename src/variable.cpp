@@ -56,9 +56,7 @@ struct Membership {
         row_bytes = (n_ids + 7) / 8;
         bits.assign(frames * row_bytes, 0);
     }
-    bool present(std::size_t f, std::size_t a) const noexcept {
-        return (bits[f * row_bytes + a / 8] >> (a % 8)) & 1u;
-    }
+    bool present(std::size_t f, std::size_t a) const noexcept { return (bits[f * row_bytes + a / 8] >> (a % 8)) & 1u; }
     void set(std::size_t f, std::size_t a) noexcept { bits[f * row_bytes + a / 8] |= std::uint8_t(1u << (a % 8)); }
     std::size_t count(std::size_t f) const noexcept {
         std::size_t c = 0;
@@ -85,7 +83,9 @@ std::uint64_t get_varint(ByteCursor& c) {
     }
 }
 
-std::uint64_t zz64(std::int64_t v) { return (static_cast<std::uint64_t>(v) << 1) ^ static_cast<std::uint64_t>(v >> 63); }
+std::uint64_t zz64(std::int64_t v) {
+    return (static_cast<std::uint64_t>(v) << 1) ^ static_cast<std::uint64_t>(v >> 63);
+}
 std::int64_t unzz64(std::uint64_t v) { return static_cast<std::int64_t>((v >> 1) ^ (0 - (v & 1))); }
 
 Bytes encode_membership(const Membership& m, int level) {
@@ -94,7 +94,8 @@ Bytes encode_membership(const Membership& m, int level) {
     put_le<std::uint32_t>(p, static_cast<std::uint32_t>(m.ids.size()));
     std::int64_t prev = 0;
     for (std::int64_t id : m.ids) {
-        put_varint(p, zz64(static_cast<std::int64_t>(static_cast<std::uint64_t>(id) - static_cast<std::uint64_t>(prev))));
+        put_varint(p,
+                   zz64(static_cast<std::int64_t>(static_cast<std::uint64_t>(id) - static_cast<std::uint64_t>(prev))));
         prev = id;
     }
     put_le<std::uint32_t>(p, static_cast<std::uint32_t>(m.nframes));
@@ -166,7 +167,8 @@ FrameBatch densify(const FrameBatch& b, const std::vector<std::size_t>& off, std
     std::vector<std::uint32_t> slot(off[e] - off[s]);
     for (std::size_t f = s; f < e; ++f)
         for (std::size_t a = 0; a < b.atoms_in(f); ++a) {
-            const auto k = static_cast<std::size_t>(std::lower_bound(all.begin(), all.end(), id_of(f, a)) - all.begin());
+            const auto k =
+                static_cast<std::size_t>(std::lower_bound(all.begin(), all.end(), id_of(f, a)) - all.begin());
             if (m.present(f - s, k))
                 invalid("atom id " + std::to_string(id_of(f, a)) + " appears twice in frame " + std::to_string(f));
             m.set(f - s, k);
@@ -181,7 +183,8 @@ FrameBatch densify(const FrameBatch& b, const std::vector<std::size_t>& off, std
             for (std::size_t a = 0; a < b.atoms_in(f); ++a) {
                 const std::size_t from = (off[f] + a) * w, to = ((f - s) * N + slot[off[f] - off[s] + a]) * w;
                 std::copy(src.begin() + static_cast<std::ptrdiff_t>(from),
-                          src.begin() + static_cast<std::ptrdiff_t>(from + w), dst.begin() + static_cast<std::ptrdiff_t>(to));
+                          src.begin() + static_cast<std::ptrdiff_t>(from + w),
+                          dst.begin() + static_cast<std::ptrdiff_t>(to));
             }
         // Fill absent slots from the nearest frame that has the atom. That is
         // the closest earlier frame if there is one, otherwise the first later

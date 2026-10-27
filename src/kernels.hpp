@@ -30,9 +30,7 @@ inline std::uint32_t zigzag(std::int32_t v) noexcept {
     return (u << 1) ^ static_cast<std::uint32_t>(v >> 31);
 }
 
-inline std::int32_t unzigzag(std::uint32_t v) noexcept {
-    return static_cast<std::int32_t>((v >> 1) ^ (0u - (v & 1u)));
-}
+inline std::int32_t unzigzag(std::uint32_t v) noexcept { return static_cast<std::int32_t>((v >> 1) ^ (0u - (v & 1u))); }
 
 inline std::uint32_t float_bits(float v) noexcept {
     std::uint32_t u;

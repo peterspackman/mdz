@@ -201,8 +201,7 @@ int cmd_compress(const Args& a) {
     std::optional<std::size_t> natoms;
     if (a.has("natoms")) {
         if (recordable_source_ext(first_ext))
-            fail("--natoms applies only to raw float32 input; ." + first_ext +
-                 " files declare their own atom count");
+            fail("--natoms applies only to raw float32 input; ." + first_ext + " files declare their own atom count");
         natoms = static_cast<std::size_t>(a.get_int("natoms", 0, 1, 1ll << 40));
     }
 
@@ -237,8 +236,10 @@ int cmd_compress(const Args& a) {
         for (const auto& p : inputs) {
             readers.push_back(open_input(p, natoms));
             auto n = readers.back()->nframes();
-            if (total && n) *total += *n;
-            else total.reset();
+            if (total && n)
+                *total += *n;
+            else
+                total.reset();
         }
     };
     open_readers();
@@ -281,7 +282,8 @@ int cmd_compress(const Args& a) {
                             first.natoms = b->natoms;
                         } else if (!variable) {
                             std::string why;
-                            if (b->variable()) why = inputs[i] + ": the atoms change";
+                            if (b->variable())
+                                why = inputs[i] + ": the atoms change";
                             else if (b->natoms != first.natoms)
                                 why = inputs[i] + ": " + std::to_string(b->natoms) + " atoms per frame, after " +
                                       std::to_string(first.natoms);
@@ -353,9 +355,9 @@ int cmd_compress(const Args& a) {
     }
 
     const std::uint64_t size = file_size(output);
-    status("Output: " + fixed(double(size) / 1e6, 4) + " MB, ratio: " +
-           fixed(double(raw) / double(std::max<std::uint64_t>(size, 1)), 1) + "x, time: " + fixed(secs, 3) + "s (" +
-           fixed(double(raw) / 1e6 / std::max(secs, 1e-9), 1) + " MB/s)");
+    status("Output: " + fixed(double(size) / 1e6, 4) +
+           " MB, ratio: " + fixed(double(raw) / double(std::max<std::uint64_t>(size, 1)), 1) +
+           "x, time: " + fixed(secs, 3) + "s (" + fixed(double(raw) / 1e6 / std::max(secs, 1e-9), 1) + " MB/s)");
     status(ok("Saved " + output));
     return 0;
 }
@@ -374,8 +376,7 @@ int cmd_decompress(const Args& a) {
     const auto recorded = source_format(r);
     const bool defaulted = !a.has("output");
     std::string output = a.get("output");
-    if (defaulted)
-        output = with_extension(input, format ? format_ext(*format) : recorded.value_or("extxyz"));
+    if (defaulted) output = with_extension(input, format ? format_ext(*format) : recorded.value_or("extxyz"));
     Output out = Output::resolve(output, format);
     if (!out.to_stdout) {
         std::error_code ec;
@@ -445,7 +446,8 @@ int cmd_extract(const Args& a) {
         fs::path p = fs::u8path(input);
         std::string stem = p.stem().u8string();
         if (stem.empty()) stem = "frames";
-        output = (p.parent_path() / (stem + "-" + std::to_string(start) + "-" + std::to_string(end) + "." + ext)).u8string();
+        output =
+            (p.parent_path() / (stem + "-" + std::to_string(start) + "-" + std::to_string(end) + "." + ext)).u8string();
     }
     Output out = Output::resolve(output, format);
     out.ensure_writable({input}, a.has("force"));
@@ -516,7 +518,8 @@ int cmd_convert(const Args& a) {
                     if (variable && fixed_count_only(out.format))
                         throw mdz::Error(mdz::ErrorKind::InvalidInput,
                                          std::string(format_name(out.format)) + " holds one atom count per file, and " +
-                                             input + "'s atom count varies from frame to frame; write .xtc, "
+                                             input +
+                                             "'s atom count varies from frame to frame; write .xtc, "
                                              ".extxyz, .xyz, .pdb or .lammpstrj instead");
                     for (std::size_t f = 0; f < b->nframes; ++f) {
                         min_atoms = std::min(min_atoms, b->atoms_in(f));
@@ -622,13 +625,14 @@ int cmd_info(const Args& a) {
         const std::size_t raw = ct.raw_size();
         const std::uint64_t size = file_size(input);
         line("File format", "MDZ v4 (columnar)");
-        line("Status", r.complete() ? "complete"
-                                    : "incomplete: not closed by its writer; " +
-                                          std::to_string(r.status().trailing_bytes) +
-                                          " trailing bytes after the last complete group");
+        line("Status", r.complete()
+                           ? "complete"
+                           : "incomplete: not closed by its writer; " + std::to_string(r.status().trailing_bytes) +
+                                 " trailing bytes after the last complete group");
         if (r.variable_atoms()) {
             const auto [lo, hi] = atom_range(r.frame_natoms());
-            line("Atoms", "varying, " + (lo == hi ? std::to_string(lo) : std::to_string(lo) + "-" + std::to_string(hi)) +
+            line("Atoms", "varying, " +
+                              (lo == hi ? std::to_string(lo) : std::to_string(lo) + "-" + std::to_string(hi)) +
                               " per frame");
         } else {
             line("Atoms", std::to_string(ct.natoms));
@@ -643,7 +647,8 @@ int cmd_info(const Args& a) {
                 lo = std::min(lo, ct.gofs.span(i).size());
             }
         }
-        if (uniform) line("GoF size", std::to_string(ct.gof_size));
+        if (uniform)
+            line("GoF size", std::to_string(ct.gof_size));
         else
             line("GoF size", std::to_string(ct.gof_size) + " nominal (" + std::to_string(ct.gofs.size()) +
                                  " groups of " + std::to_string(lo) + "-" + std::to_string(ct.gofs.max_len()) +

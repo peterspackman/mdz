@@ -117,8 +117,9 @@ void check_frames(const FrameBatch& want, const FrameBatch& got, float tol, bool
 
 std::string lammps_frame(std::int64_t step, const std::vector<int>& ids, const char* extra = "") {
     std::ostringstream o;
-    o << "ITEM: TIMESTEP\n" << step << "\nITEM: NUMBER OF ATOMS\n" << ids.size()
-      << "\nITEM: BOX BOUNDS pp pp pp\n0 10\n0 10\n0 10\nITEM: ATOMS id type x y z" << extra << "\n";
+    o << "ITEM: TIMESTEP\n"
+      << step << "\nITEM: NUMBER OF ATOMS\n"
+      << ids.size() << "\nITEM: BOX BOUNDS pp pp pp\n0 10\n0 10\n0 10\nITEM: ATOMS id type x y z" << extra << "\n";
     for (int id : ids) {
         o << id << " " << 1 + id % 3 << " " << id << ".5 " << step << " 1";
         if (*extra) o << " " << id * 2;
@@ -133,8 +134,8 @@ std::string lammps_frame(std::int64_t step, const std::vector<int>& ids, const c
 TEST(lammps_reader_follows_atoms_that_come_and_go) {
     // Atom 4 is deposited, then atom 2 is deleted. The ids are out of order in
     // one frame.
-    const std::string dump = lammps_frame(0, {1, 2, 3}) + lammps_frame(10, {1, 2, 3}) +
-                             lammps_frame(20, {3, 1, 4, 2}) + lammps_frame(30, {1, 3, 4});
+    const std::string dump = lammps_frame(0, {1, 2, 3}) + lammps_frame(10, {1, 2, 3}) + lammps_frame(20, {3, 1, 4, 2}) +
+                             lammps_frame(30, {1, 3, 4});
     auto r = reader("lammps", bytes_of(dump));
     // The first two frames have the same atoms, so they form a fixed batch.
     auto b1 = r->read_batch(2);
@@ -208,26 +209,30 @@ TEST(lammps_varying_dump_round_trips_through_mdz) {
 
 // --- extxyz / xyz ---
 TEST(extxyz_reader_takes_ids_from_the_id_property) {
-    const std::string two = "2\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 7\nH 1 0 0 3\n"
-                            "3\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 7\nH 1 0 0 3\nC 2 0 0 9\n";
+    const std::string two =
+        "2\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 7\nH 1 0 0 3\n"
+        "3\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 7\nH 1 0 0 3\nC 2 0 0 9\n";
     FrameBatch b = read_all("extxyz", two);
     REQUIRE(b.variable());
     CHECK(*b.frame_natoms == (std::vector<std::size_t>{2, 3}));
     CHECK(*b.frame(1).atom_ids == (std::vector<std::int32_t>{7, 3, 9}));
     CHECK(*b.frame(1).atom_names == (std::vector<std::string>{"O", "H", "C"}));
     // A frame with the same count but different ids is also variable.
-    FrameBatch c = read_all("extxyz", "1\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 1\n"
-                                      "1\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 2\n");
+    FrameBatch c = read_all("extxyz",
+                            "1\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 1\n"
+                            "1\nProperties=species:S:1:pos:R:3:id:I:1\nO 0 0 0 2\n");
     CHECK(c.variable());
     // Without ids, atoms are identified by their position in the frame.
-    FrameBatch d = read_all("extxyz", "1\nProperties=species:S:1:pos:R:3\nO 0 0 0\n"
-                                      "2\nProperties=species:S:1:pos:R:3\nO 0 0 0\nH 1 1 1\n");
+    FrameBatch d = read_all("extxyz",
+                            "1\nProperties=species:S:1:pos:R:3\nO 0 0 0\n"
+                            "2\nProperties=species:S:1:pos:R:3\nO 0 0 0\nH 1 1 1\n");
     REQUIRE(d.variable());
     CHECK(d.int_columns.count(mdz::columns::kId) == 0);
     // A fixed-count file with ids reads as a fixed batch and writes back
     // byte-identical.
-    const std::string fixed = "2\nProperties=species:S:1:pos:R:3:id:I:1 pbc=\"T T T\"\n"
-                              "O 0.000000 0.000000 0.000000 7\nH 1.000000 0.000000 0.000000 3\n";
+    const std::string fixed =
+        "2\nProperties=species:S:1:pos:R:3:id:I:1 pbc=\"T T T\"\n"
+        "O 0.000000 0.000000 0.000000 7\nH 1.000000 0.000000 0.000000 3\n";
     FrameBatch e = read_all("extxyz", fixed + fixed);
     CHECK(!e.variable());
     CHECK(*e.atom_ids == (std::vector<std::int32_t>{7, 3}));
@@ -278,11 +283,12 @@ TEST(xyz_reads_and_writes_frames_of_different_sizes) {
 
 // --- PDB ---
 TEST(pdb_models_of_different_sizes_vary_by_serial) {
-    const char* models = "MODEL        1\n"
-                         "ATOM      5  O   WAT A   1       1.000   2.000   3.000\n"
-                         "ATOM      9  H   WAT A   1       1.500   2.000   3.000\nENDMDL\n"
-                         "MODEL        2\n"
-                         "ATOM      9  H   WAT A   1       1.500   2.500   3.000\nENDMDL\nEND\n";
+    const char* models =
+        "MODEL        1\n"
+        "ATOM      5  O   WAT A   1       1.000   2.000   3.000\n"
+        "ATOM      9  H   WAT A   1       1.500   2.000   3.000\nENDMDL\n"
+        "MODEL        2\n"
+        "ATOM      9  H   WAT A   1       1.500   2.500   3.000\nENDMDL\nEND\n";
     FrameBatch b = read_all("pdb", models);
     REQUIRE(b.variable());
     CHECK(*b.frame_natoms == (std::vector<std::size_t>{2, 1}));

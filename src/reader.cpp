@@ -86,18 +86,19 @@ void Reader::read_positions(std::size_t first, std::size_t count, float* out) co
     if (ct_.variable_atoms) {
         if (first > ct_.nframes || count > ct_.nframes - first)
             throw Error(ErrorKind::OutOfRange, "frames " + std::to_string(first) + ".." +
-                                                   std::to_string(first + count) + " out of range (nframes=" +
-                                                   std::to_string(ct_.nframes) + ")");
+                                                   std::to_string(first + count) +
+                                                   " out of range (nframes=" + std::to_string(ct_.nframes) + ")");
         DecodedColumn v = decode_column(ct_, *ct_.column("positions"), first, first + count);
         for (std::size_t i = 0; i < v.f32.size(); ++i)
-            out[i] = length_to_nm_ == 1.0 ? v.f32[i] : static_cast<float>(static_cast<double>(v.f32[i]) * length_to_nm_);
+            out[i] =
+                length_to_nm_ == 1.0 ? v.f32[i] : static_cast<float>(static_cast<double>(v.f32[i]) * length_to_nm_);
         return;
     }
     if (count == 0 || ct_.natoms == 0) {
         if (first > ct_.nframes || count > ct_.nframes - first)
             throw Error(ErrorKind::OutOfRange, "frames " + std::to_string(first) + ".." +
-                                                   std::to_string(first + count) + " out of range (nframes=" +
-                                                   std::to_string(ct_.nframes) + ")");
+                                                   std::to_string(first + count) +
+                                                   " out of range (nframes=" + std::to_string(ct_.nframes) + ")");
         return;
     }
     if (first > ct_.nframes || count > ct_.nframes - first)
@@ -135,9 +136,9 @@ void Reader::read_positions(std::size_t first, std::size_t count, float* out) co
             }
             if (!hit) {
                 whole.resize(s.size() * n3);
-                const detail::DecodedSpan got = detail::decode_f32_group(
-                    *col, gi, s.size(), natoms, raw, tmp, whole.data(), again ? 0 : rlo, again ? s.size() : rhi,
-                    ct_.rigid.get());
+                const detail::DecodedSpan got =
+                    detail::decode_f32_group(*col, gi, s.size(), natoms, raw, tmp, whole.data(), again ? 0 : rlo,
+                                             again ? s.size() : rhi, ct_.rigid.get());
                 std::memcpy(dst, whole.data() + rlo * n3, (rhi - rlo) * n3 * sizeof(float));
                 std::lock_guard<std::mutex> l(cache.mutex);
                 cache.group = gi;

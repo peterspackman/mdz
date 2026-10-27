@@ -31,10 +31,18 @@ int main(int argc, char** argv) {
             for (int e = 0; e < edits && !v.empty(); ++e) {
                 const std::size_t at = rng() % v.size();
                 switch (rng() % 5) {
-                    case 0: v[at] ^= static_cast<std::uint8_t>(1u << (rng() % 8)); break;
-                    case 1: v[at] = static_cast<std::uint8_t>(rng()); break;
-                    case 2: v.resize(at); break;
-                    case 3: v.insert(v.begin() + static_cast<std::ptrdiff_t>(at), static_cast<std::uint8_t>(rng())); break;
+                    case 0:
+                        v[at] ^= static_cast<std::uint8_t>(1u << (rng() % 8));
+                        break;
+                    case 1:
+                        v[at] = static_cast<std::uint8_t>(rng());
+                        break;
+                    case 2:
+                        v.resize(at);
+                        break;
+                    case 3:
+                        v.insert(v.begin() + static_cast<std::ptrdiff_t>(at), static_cast<std::uint8_t>(rng()));
+                        break;
                     case 4: {  // an interesting 32-bit value
                         static const std::uint32_t vals[] = {0, 1, 0x7FFFFFFF, 0x80000000u, 0xFFFFFFFFu, 65535, 256};
                         std::uint32_t x = vals[rng() % 7];

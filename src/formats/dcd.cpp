@@ -41,7 +41,8 @@ inline std::uint32_t bswap32(std::uint32_t v) noexcept {
     return (v >> 24) | ((v >> 8) & 0xff00u) | ((v << 8) & 0xff0000u) | (v << 24);
 }
 inline std::uint64_t bswap64(std::uint64_t v) noexcept {
-    return (static_cast<std::uint64_t>(bswap32(static_cast<std::uint32_t>(v))) << 32) | bswap32(static_cast<std::uint32_t>(v >> 32));
+    return (static_cast<std::uint64_t>(bswap32(static_cast<std::uint32_t>(v))) << 32) |
+           bswap32(static_cast<std::uint32_t>(v >> 32));
 }
 
 [[noreturn]] void bad(const std::string& name, const std::string& what) {
@@ -149,24 +150,24 @@ private:
         read_exact(*in_, h, 4);
         const std::uint32_t le = load_le<std::uint32_t>(h);
         const std::uint32_t be = bswap32(le);
-        if (le == 84) order_.swap = false;
-        else if (be == 84) order_.swap = true;
+        if (le == 84)
+            order_.swap = false;
+        else if (be == 84)
+            order_.swap = true;
         else
-            bad(in_->name(), "cannot detect DCD endianness: first record marker is " + std::to_string(le) +
-                                 " (LE) / " + std::to_string(be) + " (BE), expected 84");
+            bad(in_->name(), "cannot detect DCD endianness: first record marker is " + std::to_string(le) + " (LE) / " +
+                                 std::to_string(be) + " (BE), expected 84");
         read_exact(*in_, h + 4, 4);
         if (std::memcmp(h + 4, "CORD", 4) != 0) bad(in_->name(), "expected CORD magic");
         // The rest of record 1 and its end marker.
         read_exact(*in_, h + 8, 84);
         const std::int32_t nframes = order_.i32(h + 8);
-        if (nframes < 0)
-            bad(in_->name(), "DCD header declares negative frame count (" + std::to_string(nframes) + ")");
+        if (nframes < 0) bad(in_->name(), "DCD header declares negative frame count (" + std::to_string(nframes) + ")");
         nframes_ = static_cast<std::size_t>(nframes);
         // Offsets 12 to 40 hold istart, nsavc, nstep and four unused words.
         const std::int32_t nfixed = order_.i32(h + 40);
         if (nfixed != 0)
-            bad(in_->name(),
-                "DCD files with fixed atoms (nfixed=" + std::to_string(nfixed) + ") are not supported");
+            bad(in_->name(), "DCD files with fixed atoms (nfixed=" + std::to_string(nfixed) + ") are not supported");
         // delta at 44, unused at 52..84, version at 84, end marker at 88.
         has_cell_ = order_.i32(h + 48) != 0;
 
@@ -211,10 +212,12 @@ private:
         for (std::size_t c = 0; c < 3; ++c) {
             const std::uint32_t marker = order_.u32(p);
             if (marker != coord_marker_)
-                bad(in_->name(), "expected " + std::to_string(coord_marker_) + "-byte coord record, got " +
-                                     std::to_string(marker));
-            if (order_.swap) scatter_channel<true>(p + 4, natoms_, out + c);
-            else scatter_channel<false>(p + 4, natoms_, out + c);
+                bad(in_->name(),
+                    "expected " + std::to_string(coord_marker_) + "-byte coord record, got " + std::to_string(marker));
+            if (order_.swap)
+                scatter_channel<true>(p + 4, natoms_, out + c);
+            else
+                scatter_channel<false>(p + 4, natoms_, out + c);
             p += 8 + natoms_ * 4;
         }
     }
@@ -299,8 +302,9 @@ public:
         if (finished_) throw Error(ErrorKind::InvalidInput, "DCD writer is already finished");
         // The header holds a single atom count for the whole file.
         if (batch.variable())
-            throw Error(ErrorKind::InvalidInput, "DCD holds one atom count per file and cannot store frames whose atom "
-                                                 "count varies; write xtc, extxyz, xyz, pdb or a LAMMPS dump instead");
+            throw Error(ErrorKind::InvalidInput,
+                        "DCD holds one atom count per file and cannot store frames whose atom "
+                        "count varies; write xtc, extxyz, xyz, pdb or a LAMMPS dump instead");
         if (started_ && batch.natoms != natoms_)
             throw Error(ErrorKind::InvalidInput, "DCD holds one atom count per file: this batch has " +
                                                      std::to_string(batch.natoms) + " atoms per frame, the file " +
@@ -319,8 +323,8 @@ public:
                 throw Error(ErrorKind::InvalidInput, "DCD holds at most 1073741823 atoms per frame");
         }
         if (b->natoms != natoms_ || pos->size() != b->nframes * natoms_ * 3)
-            throw Error(ErrorKind::InvalidInput, "DCD writer: batch does not hold " + std::to_string(natoms_) +
-                                                     " atoms per frame");
+            throw Error(ErrorKind::InvalidInput,
+                        "DCD writer: batch does not hold " + std::to_string(natoms_) + " atoms per frame");
         if (nframes_ + b->nframes > 0x7fffffff)
             throw Error(ErrorKind::InvalidInput, "DCD holds at most 2147483647 frames");
         if (!started_) {

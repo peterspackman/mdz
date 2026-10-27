@@ -53,7 +53,7 @@ private:
 namespace detail {
 struct AtomCounts;  // per-frame atom counts of a file whose count varies
 struct RigidModel;  // rigid bodies, for groups coded with them
-}
+}  // namespace detail
 
 // In files whose atom count varies, the column recording for each group
 // which atoms (by id) are present in which frames.

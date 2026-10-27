@@ -80,9 +80,12 @@ enum class BoxForm { Orthogonal, Triclinic, General };
 
 const char* form_name(BoxForm f) {
     switch (f) {
-        case BoxForm::Orthogonal: return "orthogonal";
-        case BoxForm::Triclinic: return "triclinic";
-        case BoxForm::General: return "general";
+        case BoxForm::Orthogonal:
+            return "orthogonal";
+        case BoxForm::Triclinic:
+            return "triclinic";
+        case BoxForm::General:
+            return "general";
     }
     return "orthogonal";
 }
@@ -181,8 +184,8 @@ private:
                 ++n;
             }
             if (n < per_line)
-                corrupt_at(lines_, "box bounds line " + quoted(line) + " needs " + std::to_string(per_line) +
-                                       " numbers");
+                corrupt_at(lines_,
+                           "box bounds line " + quoted(line) + " needs " + std::to_string(per_line) + " numbers");
         }
     }
 
@@ -251,7 +254,8 @@ private:
         Plan p;
         p.header.assign(atoms_line.data(), atoms_line.size());
         std::string_view rest = atoms_line.substr(11);
-        for (std::string_view t = text::next_token(rest); !t.empty(); t = text::next_token(rest)) p.names.emplace_back(t);
+        for (std::string_view t = text::next_token(rest); !t.empty(); t = text::next_token(rest))
+            p.names.emplace_back(t);
         const std::size_t n = p.names.size();
         // A repeated column name resolves to its last occurrence.
         auto index = [&](std::string_view name) -> std::ptrdiff_t {
@@ -262,7 +266,7 @@ private:
         auto has = [&](std::string_view name) { return index(name) >= 0; };
         auto triple = [&](const char* a, const char* b, const char* c) { return has(a) && has(b) && has(c); };
         const char* const* coords;
-        static const char* const kXu[] = {"xu", "yu", "zu"}, *const kX[] = {"x", "y", "z"},
+        static const char *const kXu[] = {"xu", "yu", "zu"}, *const kX[] = {"x", "y", "z"},
                                  *const kXsu[] = {"xsu", "ysu", "zsu"}, *const kXs[] = {"xs", "ys", "zs"};
         if (triple("xu", "yu", "zu")) {
             coords = kXu;
@@ -294,7 +298,7 @@ private:
         set("type", Slot::Type, 0);
         set("element", Slot::Element, 0);
         for (std::uint32_t k = 0; k < 3; ++k) set(coords[k], Slot::Vec, k);
-        static const char* const kV[] = {"vx", "vy", "vz"}, *const kF[] = {"fx", "fy", "fz"},
+        static const char *const kV[] = {"vx", "vy", "vz"}, *const kF[] = {"fx", "fy", "fz"},
                                  *const kI[] = {"ix", "iy", "iz"};
         if (p.has_vel)
             for (std::uint32_t k = 0; k < 3; ++k) set(kV[k], Slot::Vec, 3 + k);
@@ -412,16 +416,24 @@ private:
                 const char* q = nullptr;
                 const Slot sl = plan.slots[i];
                 switch (sl.kind) {
-                    case Slot::Id: q = text::scan_number(p, e, a.id); break;
-                    case Slot::Type: q = text::scan_number(p, e, a.type); break;
+                    case Slot::Id:
+                        q = text::scan_number(p, e, a.id);
+                        break;
+                    case Slot::Type:
+                        q = text::scan_number(p, e, a.type);
+                        break;
                     case Slot::Element:
                         q = text::token_end(p, e);
                         a.el_off = static_cast<std::uint32_t>(elem_arena_.size());
                         a.el_len = static_cast<std::uint32_t>(q - p);
                         elem_arena_.append(p, static_cast<std::size_t>(q - p));
                         break;
-                    case Slot::Vec: q = text::scan_number(p, e, a.vec[sl.k]); break;
-                    case Slot::Image: q = text::scan_number(p, e, a.image[sl.k]); break;
+                    case Slot::Vec:
+                        q = text::scan_number(p, e, a.vec[sl.k]);
+                        break;
+                    case Slot::Image:
+                        q = text::scan_number(p, e, a.image[sl.k]);
+                        break;
                     case Slot::Float: {
                         float v = 0;
                         q = text::scan_number(p, e, v);
@@ -466,8 +478,8 @@ private:
         for (std::size_t i = 0; i < natoms; ++i) {
             const std::int64_t id = at(i).id;
             if (id < std::numeric_limits<std::int32_t>::min() || id > std::numeric_limits<std::int32_t>::max())
-                corrupt_at(lines_, "atom id " + std::to_string(id) +
-                                       " does not fit in 32 bits, which mdz stores ids in");
+                corrupt_at(lines_,
+                           "atom id " + std::to_string(id) + " does not fit in 32 bits, which mdz stores ids in");
         }
 
         // Usually the atoms match the reference frame and the frame is
@@ -698,8 +710,8 @@ void box_block(text::TextWriter& w, Vec3 origin, Box m, std::string_view boundar
 // Returns the inverse of a row-major 3x3 matrix, or nullopt if it is singular
 // or the determinant is not finite.
 std::optional<Box> invert3(const Box& m) {
-    const double det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) +
-                       m[2] * (m[3] * m[7] - m[4] * m[6]);
+    const double det =
+        m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]);
     if (det == 0.0 || !std::isfinite(det)) return std::nullopt;
     const double d = 1.0 / det;
     return Box{(m[4] * m[8] - m[5] * m[7]) * d, (m[2] * m[7] - m[1] * m[8]) * d, (m[1] * m[5] - m[2] * m[4]) * d,
@@ -742,7 +754,7 @@ public:
         // These factors match FrameBatch::convert_units. They are applied while
         // writing, which avoids copying the batch.
         const bool same = batch.units && *batch.units == *units;
-        auto factor = [&](double LammpsUnits::*f) {
+        auto factor = [&](double LammpsUnits::* f) {
             if (same) return 1.0;
             return (batch.units ? batch.units->*f : 1.0) / (units->*f);
         };
@@ -757,7 +769,8 @@ public:
         for (const std::vector<float>* v : {pos, vel, frc})
             if (v && v->size() < per_atom * 3) invalid("a per-atom vector column is shorter than the batch");
         const std::vector<std::int32_t>* image = nullptr;
-        if (auto it = batch.int_columns.find("image"); it != batch.int_columns.end() && it->second.size() == per_atom * 3)
+        if (auto it = batch.int_columns.find("image");
+            it != batch.int_columns.end() && it->second.size() == per_atom * 3)
             image = &it->second;
         for (const auto* s : {batch.atom_ids.get(), batch.atom_types.get()})
             if (s && s->size() < natoms) invalid("per-atom metadata is shorter than the atom count");
@@ -772,15 +785,19 @@ public:
         // Scaled coordinates are stored as Cartesian and converted back for
         // each frame, which needs that frame's box. Without a box in the first
         // frame, they are written unscaled.
-        static const char* const kXu[] = {"xu", "yu", "zu"}, *const kX[] = {"x", "y", "z"},
+        static const char *const kXu[] = {"xu", "yu", "zu"}, *const kX[] = {"x", "y", "z"},
                                  *const kXsu[] = {"xsu", "ysu", "zsu"}, *const kXs[] = {"xs", "ys", "zs"};
         const char* const* coord = kX;
         bool scaled = false;
         if (const std::string* c = attr(kAttrCoords)) {
-            if (*c == "unwrapped") coord = kXu;
-            else if (*c == "scaled" && have_box0) coord = kXs, scaled = true;
-            else if (*c == "scaled-unwrapped" && have_box0) coord = kXsu, scaled = true;
-            else if (*c == "scaled-unwrapped") coord = kXu;
+            if (*c == "unwrapped")
+                coord = kXu;
+            else if (*c == "scaled" && have_box0)
+                coord = kXs, scaled = true;
+            else if (*c == "scaled-unwrapped" && have_box0)
+                coord = kXsu, scaled = true;
+            else if (*c == "scaled-unwrapped")
+                coord = kXu;
         }
         std::vector<std::string_view> orig;
         const std::string* orig_attr = attr(kAttrColumns);
@@ -821,9 +838,12 @@ public:
             std::vector<std::string_view> mapped;
             for (std::string_view c : orig) {
                 // Map each original coordinate name to the one being written.
-                if (c == "xs" || c == "xsu" || c == "x" || c == "xu") c = coord[0];
-                else if (c == "ys" || c == "ysu" || c == "y" || c == "yu") c = coord[1];
-                else if (c == "zs" || c == "zsu" || c == "z" || c == "zu") c = coord[2];
+                if (c == "xs" || c == "xsu" || c == "x" || c == "xu")
+                    c = coord[0];
+                else if (c == "ys" || c == "ysu" || c == "y" || c == "yu")
+                    c = coord[1];
+                else if (c == "zs" || c == "zsu" || c == "z" || c == "zu")
+                    c = coord[2];
                 mapped.push_back(c);
             }
             std::vector<std::string_view> so = mapped, sa = available;
@@ -844,15 +864,24 @@ public:
             Src s{Src::Zero};
             const bool vec3 = c.size() == 2 && c[1] >= 'x' && c[1] <= 'z';
             const int k = vec3 ? c[1] - 'x' : 0;
-            if (c == "id") s.kind = Src::Id;
-            else if (c == "type") s.kind = Src::Type;
-            else if (c == "element") s.kind = Src::Element;
-            else if (c == coord[0] || c == coord[1] || c == coord[2]) s = {Src::Coord, c == coord[0] ? 0 : c == coord[1] ? 1 : 2};
-            else if (vec3 && c[0] == 'v' && vel) s = {Src::Vel, k};
-            else if (vec3 && c[0] == 'f' && frc) s = {Src::Force, k};
-            else if (vec3 && c[0] == 'i' && image) s = {Src::Image, k};
-            else if (auto* f = batch.column(c)) s.kind = Src::Float, s.f = f;
-            else if (auto it = batch.int_columns.find(c); it != batch.int_columns.end()) s.kind = Src::Int, s.i = &it->second;
+            if (c == "id")
+                s.kind = Src::Id;
+            else if (c == "type")
+                s.kind = Src::Type;
+            else if (c == "element")
+                s.kind = Src::Element;
+            else if (c == coord[0] || c == coord[1] || c == coord[2])
+                s = {Src::Coord, c == coord[0] ? 0 : c == coord[1] ? 1 : 2};
+            else if (vec3 && c[0] == 'v' && vel)
+                s = {Src::Vel, k};
+            else if (vec3 && c[0] == 'f' && frc)
+                s = {Src::Force, k};
+            else if (vec3 && c[0] == 'i' && image)
+                s = {Src::Image, k};
+            else if (auto* f = batch.column(c))
+                s.kind = Src::Float, s.f = f;
+            else if (auto it = batch.int_columns.find(c); it != batch.int_columns.end())
+                s.kind = Src::Int, s.i = &it->second;
             if ((s.f && s.f->size() < per_atom) || (s.i && s.i->size() < per_atom))
                 invalid("column '" + std::string(c) + "' is shorter than the batch");
             srcs.push_back(s);
@@ -883,8 +912,10 @@ public:
             Vec3 o;
             Box m;
             const bool has_box = frame_box(f, o, m);
-            if (has_box) box_block(w_, o, m, boundary, general);
-            else w_.put("ITEM: BOX BOUNDS ").put(boundary).put("\n0 1\n0 1\n0 1\n");
+            if (has_box)
+                box_block(w_, o, m, boundary, general);
+            else
+                w_.put("ITEM: BOX BOUNDS ").put(boundary).put("\n0 1\n0 1\n0 1\n");
             w_.put("ITEM: ATOMS");
             for (std::string_view c : columns) w_.put(' ').put(c);
             w_.put('\n');
@@ -903,7 +934,8 @@ public:
                 double frac[3] = {0.0, 0.0, 0.0};
                 if (scaled) {
                     double d[3];
-                    for (int k = 0; k < 3; ++k) d[k] = static_cast<double>(conv(p[3 * a + k], fl)) - o[static_cast<std::size_t>(k)];
+                    for (int k = 0; k < 3; ++k)
+                        d[k] = static_cast<double>(conv(p[3 * a + k], fl)) - o[static_cast<std::size_t>(k)];
                     for (int j = 0; j < 3; ++j) frac[j] = d[0] * inv[j] + d[1] * inv[3 + j] + d[2] * inv[6 + j];
                 }
                 bool first = true;
@@ -911,22 +943,42 @@ public:
                     if (!first) w_.put(' ');
                     first = false;
                     switch (s.kind) {
-                        case Src::Id: w_.put_int(batch.atom_ids ? (*batch.atom_ids)[a] : static_cast<std::int32_t>(a + 1)); break;
-                        case Src::Type: w_.put_int(batch.atom_types ? (*batch.atom_types)[a] : 1); break;
-                        case Src::Element: w_.put(batch.elements ? std::string_view((*batch.elements)[a]) : "X"); break;
+                        case Src::Id:
+                            w_.put_int(batch.atom_ids ? (*batch.atom_ids)[a] : static_cast<std::int32_t>(a + 1));
+                            break;
+                        case Src::Type:
+                            w_.put_int(batch.atom_types ? (*batch.atom_types)[a] : 1);
+                            break;
+                        case Src::Element:
+                            w_.put(batch.elements ? std::string_view((*batch.elements)[a]) : "X");
+                            break;
                         case Src::Coord:
                             // Positions are stored as f32 Cartesian, so digits
                             // past the 6th of a fraction are noise. Write 6,
                             // matching LAMMPS.
-                            if (scaled) w_.put_shortest(g6(frac[s.k]));
-                            else w_.put_shortest(conv(p[3 * a + static_cast<std::size_t>(s.k)], fl));
+                            if (scaled)
+                                w_.put_shortest(g6(frac[s.k]));
+                            else
+                                w_.put_shortest(conv(p[3 * a + static_cast<std::size_t>(s.k)], fl));
                             break;
-                        case Src::Vel: w_.put_shortest(conv((*vel)[base + static_cast<std::size_t>(s.k)], fv)); break;
-                        case Src::Force: w_.put_shortest(conv((*frc)[base + static_cast<std::size_t>(s.k)], ff)); break;
-                        case Src::Image: w_.put_int((*image)[base + static_cast<std::size_t>(s.k)]); break;
-                        case Src::Float: w_.put_shortest((*s.f)[idx]); break;
-                        case Src::Int: w_.put_int((*s.i)[idx]); break;
-                        case Src::Zero: w_.put('0'); break;
+                        case Src::Vel:
+                            w_.put_shortest(conv((*vel)[base + static_cast<std::size_t>(s.k)], fv));
+                            break;
+                        case Src::Force:
+                            w_.put_shortest(conv((*frc)[base + static_cast<std::size_t>(s.k)], ff));
+                            break;
+                        case Src::Image:
+                            w_.put_int((*image)[base + static_cast<std::size_t>(s.k)]);
+                            break;
+                        case Src::Float:
+                            w_.put_shortest((*s.f)[idx]);
+                            break;
+                        case Src::Int:
+                            w_.put_int((*s.i)[idx]);
+                            break;
+                        case Src::Zero:
+                            w_.put('0');
+                            break;
                     }
                 }
                 w_.put('\n');

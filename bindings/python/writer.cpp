@@ -65,8 +65,8 @@ void init_writer(PyWriter* self, const std::filesystem::path& path, nb::handle a
                  const std::string& codec, bool lossless, bool append, bool variable_atoms, bool rigid,
                  nb::handle bodies) {
     const CodecMode mode = parse_codec_mode(codec);
-    CompressOptions opts = make_options(precision, gof_size, predictor_order, zstd_level, adaptive, anchor_step,
-                                        lossless);
+    CompressOptions opts =
+        make_options(precision, gof_size, predictor_order, zstd_level, adaptive, anchor_step, lossless);
     opts.codec = mode;
     add_column_precision(opts, column_precision);
     opts.variable_atoms = variable_atoms;
@@ -74,11 +74,13 @@ void init_writer(PyWriter* self, const std::filesystem::path& path, nb::handle a
     opts.validate();
     if (variable_atoms) {
         if (opts.rigid)
-            value_error("rigid bodies need a fixed atom count: rigid and bodies cannot be used with "
-                        "variable_atoms=True");
+            value_error(
+                "rigid bodies need a fixed atom count: rigid and bodies cannot be used with "
+                "variable_atoms=True");
         if (!atom_names.is_none() || !atom_types.is_none() || !atom_ids.is_none())
-            value_error("with variable_atoms=True the atoms can change from frame to frame, so there is no static "
-                        "atom_names, atom_types or atom_ids: pass each frame's ids to write(..., ids=...)");
+            value_error(
+                "with variable_atoms=True the atoms can change from frame to frame, so there is no static "
+                "atom_names, atom_types or atom_ids: pass each frame's ids to write(..., ids=...)");
     }
     const std::string p = path_str(path);
 
@@ -91,7 +93,8 @@ void init_writer(PyWriter* self, const std::filesystem::path& path, nb::handle a
         // file so the caller does not have to pass it again.
         Metadata meta = nogil([&] { return load(p).decoded_metadata(); });
         if (meta.attributes.count(kUnitsAttr))
-            value_error(p + " stores a LAMMPS dump in its native units; mdz.Writer writes nm/ps and cannot append to it");
+            value_error(p +
+                        " stores a LAMMPS dump in its native units; mdz.Writer writes nm/ps and cannot append to it");
         opts.source_format = meta.source_format;
         w.emplace(nogil([&] { return Writer::append(p, opts); }));
         if (const FrameBatch* b = w->appended_metadata()) {
@@ -136,10 +139,9 @@ void write_frames(PyWriter& self, nb::handle positions, nb::handle velocities, n
     self.open();
     static PyObject* ndim = numpy_attr("ndim");
     const bool single = nb::cast<std::size_t>(nb::handle(ndim)(positions)) == 2;
-    nb::object pos = frame_arg(positions, single), vel = frame_arg(velocities, single),
-               frc = frame_arg(forces, single), chg = frame_arg(charge, single), cel = frame_arg(cell, single),
-               tim = frame_arg(time, single), ene = frame_arg(energy, single), stp = frame_arg(step, single),
-               box = frame_arg(boxes, single);
+    nb::object pos = frame_arg(positions, single), vel = frame_arg(velocities, single), frc = frame_arg(forces, single),
+               chg = frame_arg(charge, single), cel = frame_arg(cell, single), tim = frame_arg(time, single),
+               ene = frame_arg(energy, single), stp = frame_arg(step, single), box = frame_arg(boxes, single);
     FrameBatch batch = FrameArgs{pos, vel, frc, chg, cel, tim, ene, stp, box}.to_batch();
     if (!self.variable && self.natoms != 0 && batch.natoms != self.natoms)
         value_error("frame has " + std::to_string(batch.natoms) + " atoms; earlier frames had " +
@@ -148,8 +150,9 @@ void write_frames(PyWriter& self, nb::handle positions, nb::handle velocities, n
     self.atoms.apply(batch);
     if (!ids.is_none()) {
         if (!self.variable)
-            value_error("ids identify the atoms of a frame when the atom count varies: open the file with "
-                        "mdz.Writer(..., variable_atoms=True), or give static atom_ids to mdz.Writer");
+            value_error(
+                "ids identify the atoms of a frame when the atom count varies: open the file with "
+                "mdz.Writer(..., variable_atoms=True), or give static atom_ids to mdz.Writer");
         Array<std::int64_t> a = as_array<std::int64_t>(ids);
         check_shape("ids", a, {batch.natoms});
         std::vector<std::int32_t> v(a.size());

@@ -38,8 +38,8 @@ inline void predict_forward(const float* const* hist, std::size_t n, std::size_t
 }
 
 // Linear interpolation between two anchors, for B-frames.
-inline void predict_interpolate(const float* before, const float* after, std::size_t t_before,
-                                std::size_t t_after, std::size_t t_current, std::size_t n3, float* out) noexcept {
+inline void predict_interpolate(const float* before, const float* after, std::size_t t_before, std::size_t t_after,
+                                std::size_t t_current, std::size_t n3, float* out) noexcept {
     if (n3 == 0) return;
     if (t_after == t_before) {
         std::memcpy(out, before, n3 * sizeof(float));

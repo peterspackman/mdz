@@ -13,14 +13,13 @@
 #include "mdz/mdz.h"
 
 #define NATOMS 50
-#define CHECK(call)                                                             \
-    do {                                                                        \
-        int rc_ = (call);                                                       \
-        if (rc_ != MDZ_OK) {                                                    \
-            fprintf(stderr, "%s:%d: %s -> %d: %s\n", __FILE__, __LINE__, #call, \
-                    rc_, mdz_last_error());                                     \
-            return 1;                                                           \
-        }                                                                       \
+#define CHECK(call)                                                                                     \
+    do {                                                                                                \
+        int rc_ = (call);                                                                               \
+        if (rc_ != MDZ_OK) {                                                                            \
+            fprintf(stderr, "%s:%d: %s -> %d: %s\n", __FILE__, __LINE__, #call, rc_, mdz_last_error()); \
+            return 1;                                                                                   \
+        }                                                                                               \
     } while (0)
 #define EXPECT(cond)                                                            \
     do {                                                                        \
@@ -32,7 +31,7 @@
 
 static double pos(int frame, int k) { return 1.0 + 0.25 * k + 0.01 * frame + 0.001 * sin(k); }
 
-static int write_frames(mdz_writer *w, int first, int count) {
+static int write_frames(mdz_writer* w, int first, int count) {
     double x[NATOMS * 3], v[NATOMS * 3], f[NATOMS * 3];
     int32_t img[NATOMS * 3];
     double box[9] = {20.0, 0, 0, 1.5, 21.0, 0, -0.5, 0.25, 22.0};
@@ -60,21 +59,21 @@ static int write_frames(mdz_writer *w, int first, int count) {
     return 0;
 }
 
-static int file_exists(const char *path) {
-    FILE *f = fopen(path, "rb");
+static int file_exists(const char* path) {
+    FILE* f = fopen(path, "rb");
     if (f) fclose(f);
     return f != NULL;
 }
 
 /* Bad arguments and inconsistent frames must return error codes. */
-static int misuse(const char *path) {
+static int misuse(const char* path) {
     double x[NATOMS * 3], v[NATOMS * 3];
     for (int k = 0; k < NATOMS * 3; k++) {
         x[k] = pos(0, k);
         v[k] = 0.0;
     }
-    mdz_writer *w = NULL;
-    mdz_reader *r = NULL;
+    mdz_writer* w = NULL;
+    mdz_reader* r = NULL;
     mdz_frame fr = {0};
     mdz_frame_out out = {0};
 
@@ -194,7 +193,7 @@ static int misuse(const char *path) {
     mdz_reader_close(r);
 
     /* A file that is not an mdz file. */
-    FILE *junk = fopen(path, "wb");
+    FILE* junk = fopen(path, "wb");
     fputs("this is not a trajectory", junk);
     fclose(junk);
     EXPECT(mdz_reader_open(path, &r) == MDZ_ERR_IO && r == NULL);
@@ -208,14 +207,14 @@ static int misuse(const char *path) {
 static int64_t vcount(int s) { return s == 5 ? 0 : 12 + (s * 5) % 9; }
 static double vpos(int s, int64_t id, int k) { return 0.5 * (double)id + 0.1 * k + 0.003 * s; }
 
-static int variable_atoms(const char *path) {
+static int variable_atoms(const char* path) {
     mdz_writer_options opts;
     mdz_writer_options_init(&opts);
     opts.units = "metal";
     opts.lossless = 1;
     opts.gof_size = 4;
     opts.variable_atoms = 1;
-    mdz_writer *w = NULL;
+    mdz_writer* w = NULL;
     /* natoms is ignored in variable-atom mode, so 0 is accepted. */
     CHECK(mdz_writer_open(path, 0, &opts, &w));
     int64_t ids[VMAX];
@@ -280,7 +279,7 @@ static int variable_atoms(const char *path) {
     }
     CHECK(mdz_writer_close(w));
 
-    mdz_reader *r = NULL;
+    mdz_reader* r = NULL;
     CHECK(mdz_reader_open(path, &r));
     EXPECT(mdz_reader_variable_atoms(r) == 1);
     EXPECT(mdz_reader_natoms(r) == 0);
@@ -373,13 +372,13 @@ static double tri(int s, int a, int k) {
     return 10.0 * (c[k] + off[k]); /* Angstrom */
 }
 
-static int rigid_bodies(const char *path) {
+static int rigid_bodies(const char* path) {
     mdz_writer_options opts;
     mdz_writer_options_init(&opts);
     opts.units = "metal";
     opts.gof_size = 5;
     opts.precision = 0.001;
-    mdz_writer *w = NULL;
+    mdz_writer* w = NULL;
     int32_t bodies[NMOL * 3];
     for (int a = 0; a < NMOL * 3; a++) bodies[a] = a / 3;
     CHECK(mdz_writer_open(path, NMOL * 3, &opts, &w));
@@ -406,7 +405,7 @@ static int rigid_bodies(const char *path) {
     }
     CHECK(mdz_writer_close(w));
 
-    mdz_reader *r = NULL;
+    mdz_reader* r = NULL;
     CHECK(mdz_reader_open(path, &r));
     int32_t back[NMOL * 3];
     EXPECT(mdz_reader_bodies(r, back) == NMOL);
@@ -446,7 +445,7 @@ static double col_pe(int s, int a) { return -3.0 + 0.001 * a + 0.0001 * s; }
 static double col_stress(int s, int a, int k) { return 100.0 * sin(0.1 * a + k) + s; }
 static int32_t col_flag(int s, int a, int k) { return (int32_t)(a * 7 + s * 3 + k); }
 
-static int fill_columns(int s, int n, double *pe, double *stress, int32_t *flag) {
+static int fill_columns(int s, int n, double* pe, double* stress, int32_t* flag) {
     for (int a = 0; a < n; a++) {
         pe[a] = col_pe(s, a);
         for (int k = 0; k < 6; k++) stress[6 * a + k] = col_stress(s, a, k);
@@ -455,11 +454,10 @@ static int fill_columns(int s, int n, double *pe, double *stress, int32_t *flag)
     return 0;
 }
 
-static int general_columns(const char *path) {
-    const mdz_column cols[3] = {
-        {"c_pe", MDZ_FLOAT, 1, 0.0}, {"stress", MDZ_FLOAT, 6, 0.01}, {"flag", MDZ_INT, 2, 0.0}};
+static int general_columns(const char* path) {
+    const mdz_column cols[3] = {{"c_pe", MDZ_FLOAT, 1, 0.0}, {"stress", MDZ_FLOAT, 6, 0.01}, {"flag", MDZ_INT, 2, 0.0}};
     mdz_writer_options opts;
-    mdz_writer *w = NULL;
+    mdz_writer* w = NULL;
 
     /* Bad declarations are refused at open. */
     mdz_column bad[2] = {{"positions", MDZ_FLOAT, 3, 0.0}, {"x", MDZ_FLOAT, 1, 0.0}};
@@ -490,13 +488,13 @@ static int general_columns(const char *path) {
     CHECK(mdz_writer_open(path, NATOMS, &opts, &w));
     double x[NATOMS * 3], pe[NATOMS], stress[NATOMS * 6];
     int32_t flag[NATOMS * 2];
-    const void *ptrs[3] = {pe, stress, flag};
+    const void* ptrs[3] = {pe, stress, flag};
     mdz_frame fr;
     mdz_frame_init(&fr);
     fr.positions = x;
     for (int k = 0; k < NATOMS * 3; k++) x[k] = pos(0, k);
     EXPECT(mdz_writer_write_frame(w, &fr) == MDZ_ERR_INVALID); /* no columns */
-    const void *missing[3] = {pe, NULL, flag};
+    const void* missing[3] = {pe, NULL, flag};
     fr.columns = missing;
     EXPECT(mdz_writer_write_frame(w, &fr) == MDZ_ERR_INVALID);
     EXPECT(strstr(mdz_last_error(), "stress") != NULL);
@@ -533,7 +531,7 @@ static int general_columns(const char *path) {
     }
     CHECK(mdz_writer_close(w));
 
-    mdz_reader *r = NULL;
+    mdz_reader* r = NULL;
     CHECK(mdz_reader_open(path, &r));
     EXPECT(mdz_reader_nframes(r) == 12);
     EXPECT(mdz_reader_ncolumns(r) == 3);
@@ -557,7 +555,7 @@ static int general_columns(const char *path) {
     EXPECT(mdz_reader_has(r, "stress") == 1);
     double pe_back[NATOMS], stress_back[NATOMS * 6];
     int32_t flag_back[NATOMS * 2];
-    void *out_ptrs[3];
+    void* out_ptrs[3];
     out_ptrs[ipe] = pe_back;
     out_ptrs[istress] = stress_back;
     out_ptrs[iflag] = flag_back;
@@ -621,8 +619,8 @@ static int general_columns(const char *path) {
     return 0;
 }
 
-int main(int argc, char **argv) {
-    const char *path = argc > 1 ? argv[1] : "c_api_test.mdz";
+int main(int argc, char** argv) {
+    const char* path = argc > 1 ? argv[1] : "c_api_test.mdz";
     printf("mdz %s\n", mdz_version());
 
     /* Lossless, metal units, 7-frame groups. */
@@ -633,7 +631,7 @@ int main(int argc, char **argv) {
     opts.gof_size = 7;
     opts.boundary = "pp pp ff";
     opts.unwrapped = 1;
-    mdz_writer *w = NULL;
+    mdz_writer* w = NULL;
     CHECK(mdz_writer_open(path, NATOMS, &opts, &w));
     int64_t ids[NATOMS];
     int32_t types[NATOMS];
@@ -655,7 +653,7 @@ int main(int argc, char **argv) {
     CHECK(mdz_writer_close(w));
 
     /* Read everything back and compare exactly. */
-    mdz_reader *r = NULL;
+    mdz_reader* r = NULL;
     CHECK(mdz_reader_open(path, &r));
     EXPECT(mdz_reader_natoms(r) == NATOMS);
     EXPECT(mdz_reader_nframes(r) == 25);

@@ -165,8 +165,7 @@ void encode_gof_temporal(const float* frames, std::size_t n, std::size_t natoms,
         for (std::size_t b = 0; b < L.bframes.size(); ++b) {
             auto [left, right] = L.brefs[b];
             const std::size_t bi = L.bframes[b];
-            predict_interpolate(recon.data() + left * n3, recon.data() + right * n3, left, right, bi, n3,
-                                pred.data());
+            predict_interpolate(recon.data() + left * n3, recon.data() + right * n3, left, right, bi, n3, pred.data());
             for (std::size_t i = 0; i < n3; ++i) residual[i] = frame(bi)[i] - pred[i];
             update_max();
         }
@@ -236,8 +235,7 @@ void encode_gof_temporal(const float* frames, std::size_t n, std::size_t natoms,
 
 static DecodedSpan decode_gof_temporal(ByteSpan data, std::size_t natoms, float base, std::size_t order,
                                        std::size_t expected, float* out, std::size_t hi) {
-    if (!(std::isfinite(base) && base > 0.0f))
-        corrupt("temporal GoF in a column with precision " + fmt(base));
+    if (!(std::isfinite(base) && base > 0.0f)) corrupt("temporal GoF in a column with precision " + fmt(base));
     const std::size_t n3 = checked_mul(natoms, 3, "atom count overflows");
     ByteCursor cur(data);
     const std::uint8_t flags = cur.u8();
@@ -327,15 +325,14 @@ void encode_gof_intra(const float* frames, std::size_t n, std::size_t natoms, fl
     }
 }
 
-static DecodedSpan decode_gof_intra(ByteSpan data, std::size_t natoms, std::size_t expected, float* out,
-                                    std::size_t lo, std::size_t hi) {
+static DecodedSpan decode_gof_intra(ByteSpan data, std::size_t natoms, std::size_t expected, float* out, std::size_t lo,
+                                    std::size_t hi) {
     ByteCursor cur(data);
     const std::size_t nframes = cur.u16();
     if (nframes != expected) frame_count_mismatch(nframes, expected);
     const std::size_t n3 = checked_mul(natoms, 3, "atom count overflows");
     // An XTC frame costs at least a bit per atom.
-    if (sat_mul(natoms, nframes) > sat_mul(cur.remaining(), 8))
-        corrupt("intra-frame GoF too short for its atom count");
+    if (sat_mul(natoms, nframes) > sat_mul(cur.remaining(), 8)) corrupt("intra-frame GoF too short for its atom count");
     thread_local std::vector<std::int32_t> lip;
     for (std::size_t f = 0; f < nframes; ++f) {
         const std::size_t len = cur.u32();
@@ -410,8 +407,8 @@ static DecodedSpan decode_gof_lossless(ByteSpan data, std::size_t natoms, std::s
         predict_forward(ptrs.data(), i, order, n3, pred.data());
         for (std::size_t j = 0; j < n3; ++j) {
             const std::size_t g = base + j;
-            const std::uint32_t w = p0[g] | (std::uint32_t(p1[g]) << 8) | (std::uint32_t(p2[g]) << 16) |
-                                    (std::uint32_t(p3[g]) << 24);
+            const std::uint32_t w =
+                p0[g] | (std::uint32_t(p1[g]) << 8) | (std::uint32_t(p2[g]) << 16) | (std::uint32_t(p3[g]) << 24);
             dst[j] = bits_float(float_bits(pred[j]) + static_cast<std::uint32_t>(unzigzag(w)));
         }
     }
@@ -467,10 +464,9 @@ GofResult encode_gof_payload(const float* frames, std::size_t n, std::size_t nat
                         "value " + fmt(max_abs) + " is out of range for precision " + fmt(p.precision) +
                             ": it would overflow the 32-bit quantizer. Use a coarser precision or rescale the data.");
     }
-    CodecMode mode = p.codec == CodecMode::Auto
-                         ? pick_codec_mode(frames, n, natoms, p.precision, p.adaptive, p.anchor_step,
-                                           p.spatial_delta, p.zstd_level)
-                         : p.codec;
+    CodecMode mode = p.codec == CodecMode::Auto ? pick_codec_mode(frames, n, natoms, p.precision, p.adaptive,
+                                                                  p.anchor_step, p.spatial_delta, p.zstd_level)
+                                                : p.codec;
     // Temporal residuals beyond the quantizer's range would saturate, so fall
     // back to intra. The intra codec quantizes the values themselves, and
     // validation has already bounded those.

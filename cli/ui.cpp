@@ -119,9 +119,8 @@ void Progress::run() {
             bar.resize(width, ' ');
             const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             const double rate = secs > 0 ? double(pos) / secs : 0;
-            std::fprintf(stderr, "\r\x1b[2K%s [%s] %llu/%llu frames (%.0f/s)", msg_.c_str(),
-                         paint("36", bar).c_str(), static_cast<unsigned long long>(pos),
-                         static_cast<unsigned long long>(total_), rate);
+            std::fprintf(stderr, "\r\x1b[2K%s [%s] %llu/%llu frames (%.0f/s)", msg_.c_str(), paint("36", bar).c_str(),
+                         static_cast<unsigned long long>(pos), static_cast<unsigned long long>(total_), rate);
         } else if (pos) {
             std::fprintf(stderr, "\r\x1b[2K%s %s (%llu frames)", paint("36", std::string(1, spin[tick % 4])).c_str(),
                          msg_.c_str(), static_cast<unsigned long long>(pos));

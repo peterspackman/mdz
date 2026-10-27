@@ -212,9 +212,12 @@ private:
                 has_ids = true;
             } else if (p.dtype == 'R' || p.dtype == 'r') {
                 std::string_view col = p.name;
-                if (col == "pos") col = "positions";
-                else if (col == "vel" || col == "velo" || col == "velocities") col = "velocities";
-                else if (col == "force" || col == "forces") col = "forces";
+                if (col == "pos")
+                    col = "positions";
+                else if (col == "vel" || col == "velo" || col == "velocities")
+                    col = "velocities";
+                else if (col == "force" || col == "forces")
+                    col = "forces";
                 st.dest = Dest::Real;
                 st.real = &column_for(b.columns, col);
             } else if (p.dtype == 'I' || p.dtype == 'i') {
@@ -248,7 +251,8 @@ private:
             };
             auto bad = [&](const char* what, const char* p, const char* e) {
                 if (count_tokens(line) < expected) short_line();
-                corrupt_at(lines_, std::string("bad ") + what + " value '" + std::string(p, text::token_end(p, e)) + "'");
+                corrupt_at(lines_,
+                           std::string("bad ") + what + " value '" + std::string(p, text::token_end(p, e)) + "'");
             };
             const char* p = line.data();
             const char* const e = p + line.size();
@@ -434,7 +438,8 @@ public:
                 throw Error(ErrorKind::InvalidInput, "atom_ids is shorter than the atom count");
             ids.reserve(per_atom);
             for (std::size_t f = 0; f < nframes; ++f)
-                ids.insert(ids.end(), batch.atom_ids->begin(), batch.atom_ids->begin() + static_cast<std::ptrdiff_t>(natoms));
+                ids.insert(ids.end(), batch.atom_ids->begin(),
+                           batch.atom_ids->begin() + static_cast<std::ptrdiff_t>(natoms));
         }
         bool ids_placed = !write_ids;
         for (const auto& [k, v] : batch.int_columns) {
@@ -497,8 +502,10 @@ public:
                 if (has_names) {
                     // Use the element if present, then the atom name, then "X".
                     std::string_view s = "X";
-                    if (elements && a < elements->size()) s = (*elements)[a];
-                    else if (names && a < names->size()) s = (*names)[a];
+                    if (elements && a < elements->size())
+                        s = (*elements)[a];
+                    else if (names && a < names->size())
+                        s = (*names)[a];
                     part().put(s);
                 }
                 auto put3 = [&](const std::vector<float>* v, double factor) {
@@ -516,8 +523,10 @@ public:
                     const std::size_t base = idx * e.width;
                     for (std::size_t k = 0; k < e.width; ++k) {
                         if (k) o.put(' ');
-                        if (e.f) o.put_fixed(static_cast<double>((*e.f)[base + k]), 6);
-                        else o.put_int((*e.i)[base + k]);
+                        if (e.f)
+                            o.put_fixed(static_cast<double>((*e.f)[base + k]), 6);
+                        else
+                            o.put_int((*e.i)[base + k]);
                     }
                 }
                 w_.put('\n');

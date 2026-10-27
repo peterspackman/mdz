@@ -8,9 +8,9 @@
 
 namespace mdz::detail {
 
-#define MDZ_FORMAT(name)                                                                                   \
+#define MDZ_FORMAT(name)                                                                                        \
     std::unique_ptr<TrajectoryReader> make_##name##_reader(std::unique_ptr<InputStream>, const FormatOptions&); \
-    std::unique_ptr<TrajectoryWriter> make_##name##_writer(std::unique_ptr<OutputStream>, std::size_t natoms, \
+    std::unique_ptr<TrajectoryWriter> make_##name##_writer(std::unique_ptr<OutputStream>, std::size_t natoms,   \
                                                            const FormatOptions&);
 MDZ_FORMAT(dcd)
 MDZ_FORMAT(xtc)
@@ -35,8 +35,10 @@ std::optional<FrameBatch> collect_frames(std::size_t n, F&& read_frame) {
     for (std::size_t i = 0; i < n; ++i) {
         std::optional<FrameBatch> f = read_frame();
         if (!f) break;
-        if (!all) all = std::move(f);
-        else all->append(*f);
+        if (!all)
+            all = std::move(f);
+        else
+            all->append(*f);
     }
     return all;
 }

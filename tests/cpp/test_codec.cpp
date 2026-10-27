@@ -52,9 +52,10 @@ TEST(every_codec_roundtrips_within_bound) {
 }
 
 TEST(lossless_is_bit_exact_on_awkward_values) {
-    const float awkward[] = {0.0f, -0.0f, 1.0f, -1.0f, 1.17549435e-38f, -1.17549435e-38f, 1e-40f, -1e-40f,
-                             3.40282347e38f, -3.40282347e38f, 3.14159265f, -2.71828183f, 1.0f / 3.0f, 123456.79f,
-                             -0.00012345679f};
+    const float awkward[] = {
+        0.0f,        -0.0f,      1.0f,           -1.0f,           1.17549435e-38f, -1.17549435e-38f,
+        1e-40f,      -1e-40f,    3.40282347e38f, -3.40282347e38f, 3.14159265f,     -2.71828183f,
+        1.0f / 3.0f, 123456.79f, -0.00012345679f};
     const std::size_t natoms = 5, n3 = 15, nframes = 8;
     std::vector<float> data(nframes * n3);
     for (std::size_t i = 0; i < n3; ++i) data[i] = awkward[i];

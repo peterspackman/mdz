@@ -52,7 +52,9 @@ Box cell_params_to_box(const CellParams& p) noexcept {
 }
 
 CellParams box_to_cell_params(const Box& m) noexcept {
-    auto dot = [&](int r, int s) { return m[3 * r] * m[3 * s] + m[3 * r + 1] * m[3 * s + 1] + m[3 * r + 2] * m[3 * s + 2]; };
+    auto dot = [&](int r, int s) {
+        return m[3 * r] * m[3 * s] + m[3 * r + 1] * m[3 * s + 1] + m[3 * r + 2] * m[3 * s + 2];
+    };
     const double la = std::sqrt(dot(0, 0)), lb = std::sqrt(dot(1, 1)), lc = std::sqrt(dot(2, 2));
     auto angle = [&](int r, int s, double lr, double ls) {
         const double d = lr * ls;
@@ -173,8 +175,7 @@ std::int32_t intern(std::vector<std::string>& table, std::map<std::string, std::
 
 void FrameBatch::make_variable() {
     if (variable()) return;
-    if (bodies)
-        throw Error(ErrorKind::InvalidInput, "rigid bodies need a fixed atom count");
+    if (bodies) throw Error(ErrorKind::InvalidInput, "rigid bodies need a fixed atom count");
     const std::size_t n = natoms, nf = nframes;
     frame_natoms.emplace(nf, n);
     auto replicate = [&](const char* name, const std::vector<std::int32_t>& per_atom) {
@@ -336,7 +337,7 @@ void FrameBatch::append(const FrameBatch& b) {
 }
 
 void FrameBatch::convert_units(const LammpsUnits* to) {
-    auto factor = [&](double LammpsUnits::*f) {
+    auto factor = [&](double LammpsUnits::* f) {
         const double from = units ? units->*f : 1.0;
         const double t = to ? to->*f : 1.0;
         return from / t;
@@ -369,8 +370,8 @@ FrameBatch FrameBatch::in_internal_units() const {
 
 std::vector<std::string> FrameBatch::available_data() const {
     static const std::pair<const char*, const char*> meta[] = {
-        {columns::kId, "atom_ids"},        {columns::kType, "atom_types"},  {columns::kResid, "residue_ids"},
-        {columns::kHetatm, "hetatm"},      {columns::kName, "atom_names"},  {columns::kElement, "elements"},
+        {columns::kId, "atom_ids"},           {columns::kType, "atom_types"}, {columns::kResid, "residue_ids"},
+        {columns::kHetatm, "hetatm"},         {columns::kName, "atom_names"}, {columns::kElement, "elements"},
         {columns::kResname, "residue_names"}, {columns::kChain, "chain_ids"}};
     std::vector<std::string> d;
     for (const auto& kv : columns) d.push_back(kv.first);

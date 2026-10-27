@@ -86,8 +86,7 @@ void emit(const std::string& file, const char* method, unsigned threads, std::si
         "{\"file\": \"%s\", \"method\": \"%s\", \"threads\": %u, \"natoms\": %zu, \"nframes\": %zu, "
         "\"raw_bytes\": %zu, \"bytes\": %zu, \"compress_s\": %.6f, \"decompress_s\": %.6f, "
         "\"random_us\": %.2f, \"sequential_us\": %.2f, \"max_error_A\": %.6g}\n",
-        file.c_str(), method, threads, natoms, nframes, natoms * nframes * 12, bytes, enc, dec, random_us, seq_us,
-        err);
+        file.c_str(), method, threads, natoms, nframes, natoms * nframes * 12, bytes, enc, dec, random_us, seq_us, err);
     std::fflush(stdout);
 }
 

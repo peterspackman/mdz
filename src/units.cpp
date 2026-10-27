@@ -60,8 +60,8 @@ LammpsUnits si_like(std::string_view style, double length, double time, double f
 
 const std::array<LammpsUnits, 8>& table() {
     static const std::array<LammpsUnits, 8> t = {
-        LammpsUnits{"real", 0.1, 1e-3, 0.1 / 1e-3, units::kKcalToKj / 0.1, units::kKcalToKj, "\xC3\x85",
-                    "\xC3\x85/fs", "kcal/mol/\xC3\x85"},
+        LammpsUnits{"real", 0.1, 1e-3, 0.1 / 1e-3, units::kKcalToKj / 0.1, units::kKcalToKj, "\xC3\x85", "\xC3\x85/fs",
+                    "kcal/mol/\xC3\x85"},
         LammpsUnits{"metal", 0.1, 1.0, 0.1, kEvToKjmolExact / 0.1, kEvToKjmolExact, "\xC3\x85", "\xC3\x85/ps",
                     "eV/\xC3\x85"},
         si_like("si", 1e9, 1e12, 1.0, 1.0, "m", "m/s", "N"),

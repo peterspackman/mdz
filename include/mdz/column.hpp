@@ -88,9 +88,7 @@ public:
     bool empty() const noexcept { return starts_.empty(); }
     std::size_t nframes() const noexcept { return nframes_; }
     // Frames [start, end) of group i. Requires i < size().
-    Span span(std::size_t i) const noexcept {
-        return {starts_[i], i + 1 < starts_.size() ? starts_[i + 1] : nframes_};
-    }
+    Span span(std::size_t i) const noexcept { return {starts_[i], i + 1 < starts_.size() ? starts_[i + 1] : nframes_}; }
     // Indices [start, end) of the groups overlapping frames [start, end). The
     // frame range is clamped to nframes(). Returns {0, 0} if it is empty.
     Span overlapping(std::size_t start, std::size_t end) const noexcept;

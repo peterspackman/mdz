@@ -123,8 +123,9 @@ int main(int argc, char** argv) {
                     raw_mb / enc, raw_mb / dec, random_us, static_cast<double>(max_err));
     }
     std::filesystem::remove(tmp);
-    std::printf("\ncompress and decompress are the codec alone, in memory. random is %d reads at\n"
-                "uniformly random frames, so nearly every one decodes a whole group.\n",
-                2000);
+    std::printf(
+        "\ncompress and decompress are the codec alone, in memory. random is %d reads at\n"
+        "uniformly random frames, so nearly every one decodes a whole group.\n",
+        2000);
     return 0;
 }

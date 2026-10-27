@@ -124,8 +124,7 @@ TEST(reader_handles_varying_atoms) {
     for (std::size_t f : {0, 7, 8, 40}) {
         auto x = r.read_frame(f);
         REQUIRE(x.size() == b.atoms_in(f) * 3);
-        for (std::size_t i = 0; i < x.size(); ++i)
-            CHECK(std::fabs(x[i] - (*b.positions())[off[f] * 3 + i]) <= 0.0005f);
+        for (std::size_t i = 0; i < x.size(); ++i) CHECK(std::fabs(x[i] - (*b.positions())[off[f] * 3 + i]) <= 0.0005f);
         CHECK(r.atom_ids(f) == *b.frame(f).atom_ids);
     }
     auto many = r.read_positions(5, 20);

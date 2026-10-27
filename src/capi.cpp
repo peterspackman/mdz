@@ -52,10 +52,14 @@ struct CError {
 
 int code_of(mdz::ErrorKind k) noexcept {
     switch (k) {
-        case mdz::ErrorKind::InvalidInput: return MDZ_ERR_INVALID;
-        case mdz::ErrorKind::Corrupt: return MDZ_ERR_IO;
-        case mdz::ErrorKind::Io: return MDZ_ERR_IO;
-        case mdz::ErrorKind::OutOfRange: return MDZ_ERR_RANGE;
+        case mdz::ErrorKind::InvalidInput:
+            return MDZ_ERR_INVALID;
+        case mdz::ErrorKind::Corrupt:
+            return MDZ_ERR_IO;
+        case mdz::ErrorKind::Io:
+            return MDZ_ERR_IO;
+        case mdz::ErrorKind::OutOfRange:
+            return MDZ_ERR_RANGE;
     }
     return MDZ_ERR_INTERNAL;
 }
@@ -159,8 +163,8 @@ std::size_t count_bodies(const std::vector<std::int32_t>& bodies) {
 struct Layout {
     bool velocities, forces, image, box, time, types;
     bool operator==(const Layout& o) const noexcept {
-        return velocities == o.velocities && forces == o.forces && image == o.image && box == o.box &&
-               time == o.time && types == o.types;
+        return velocities == o.velocities && forces == o.forces && image == o.image && box == o.box && time == o.time &&
+               types == o.types;
     }
 };
 
@@ -181,7 +185,8 @@ bool is_reserved(std::string_view name) {
 }
 
 std::vector<Column> declared_columns(const mdz_writer_options& o) {
-    if (o.ncolumns > 0 && !o.columns) invalid("opts.columns is null but opts.ncolumns is " + std::to_string(o.ncolumns));
+    if (o.ncolumns > 0 && !o.columns)
+        invalid("opts.columns is null but opts.ncolumns is " + std::to_string(o.ncolumns));
     std::vector<Column> out;
     for (std::uint32_t i = 0; i < o.ncolumns; ++i) {
         const mdz_column& c = o.columns[i];
@@ -190,15 +195,17 @@ std::vector<Column> declared_columns(const mdz_writer_options& o) {
         const std::string name = c.name;
         if (name.size() > 255) invalid(at + ": the name is longer than 255 bytes");
         if (is_reserved(name))
-            invalid(at + ": '" + name + "' is a reserved name (positions, velocities, forces, image, box, origin, "
-                                        "step, time and mdz.*)");
+            invalid(at + ": '" + name +
+                    "' is a reserved name (positions, velocities, forces, image, box, origin, "
+                    "step, time and mdz.*)");
         for (const Column& d : out)
             if (d.name == name) invalid(at + ": '" + name + "' is declared twice");
         if (c.type != MDZ_FLOAT && c.type != MDZ_INT) invalid(at + " '" + name + "' has an unknown type");
         if (c.width < 1 || c.width > 255) invalid(at + " '" + name + "': width must be 1 to 255");
         if (!std::isfinite(c.precision) || c.precision < 0.0)
             invalid(at + " '" + name + "': precision must be 0 or positive and finite");
-        if (c.type == MDZ_INT && c.precision != 0.0) invalid(at + " '" + name + "': an MDZ_INT column has no precision");
+        if (c.type == MDZ_INT && c.precision != 0.0)
+            invalid(at + " '" + name + "': an MDZ_INT column has no precision");
         out.push_back(Column{name, c.type, c.width, c.precision});
     }
     return out;
@@ -367,8 +374,9 @@ int mdz_writer_set_atoms(mdz_writer* w, const int64_t* ids, const int32_t* types
     return guard([&] {
         if (!w) invalid("writer is null");
         if (w->variable)
-            invalid("a writer whose atom count varies takes each frame's ids and types with the frame "
-                    "(mdz_frame.ids, mdz_frame.types), not mdz_writer_set_atoms");
+            invalid(
+                "a writer whose atom count varies takes each frame's ids and types with the frame "
+                "(mdz_frame.ids, mdz_frame.types), not mdz_writer_set_atoms");
         const std::size_t n = w->natoms;
         if (ids) {
             std::vector<std::int32_t> v(n);
@@ -407,13 +415,14 @@ int mdz_writer_write_frame(mdz_writer* w, const mdz_frame* frame) {
                 invalid("frame.natoms is " + std::to_string(f.natoms) + " but the writer was opened for " +
                         std::to_string(n) + " atoms (open it with opts.variable_atoms to let the count change)");
             if (f.ids || f.types)
-                invalid("frame.ids and frame.types are for a writer whose atom count varies "
-                        "(opts.variable_atoms); give fixed ones to mdz_writer_set_atoms");
+                invalid(
+                    "frame.ids and frame.types are for a writer whose atom count varies "
+                    "(opts.variable_atoms); give fixed ones to mdz_writer_set_atoms");
         }
         if (!f.positions && n > 0) invalid("frame.positions is required");
         if (f.origin && !f.box) invalid("frame.origin given without frame.box");
-        Layout layout{f.velocities != nullptr, f.forces != nullptr, f.image != nullptr, f.box != nullptr,
-                      f.has_time != 0, f.types != nullptr};
+        Layout layout{f.velocities != nullptr, f.forces != nullptr, f.image != nullptr,
+                      f.box != nullptr,        f.has_time != 0,     f.types != nullptr};
         if (n == 0 && w->layout) {
             // A frame of no atoms may leave its per-atom arrays NULL.
             layout.velocities = w->layout->velocities;
@@ -434,8 +443,8 @@ int mdz_writer_write_frame(mdz_writer* w, const mdz_frame* frame) {
         if (layout.velocities) b.columns.emplace("velocities", values(f.velocities));
         if (layout.forces) b.columns.emplace("forces", values(f.forces));
         if (layout.image)
-            b.int_columns.emplace("image", f.image ? std::vector<std::int32_t>(f.image, f.image + n3)
-                                                   : std::vector<std::int32_t>());
+            b.int_columns.emplace(
+                "image", f.image ? std::vector<std::int32_t>(f.image, f.image + n3) : std::vector<std::int32_t>());
         if (f.box) {
             mdz::Box m;
             for (std::size_t i = 0; i < 9; ++i) m[i] = f.box[i];
@@ -452,8 +461,8 @@ int mdz_writer_write_frame(mdz_writer* w, const mdz_frame* frame) {
             for (std::size_t i = 0; i < n; ++i) ids[i] = id32(f.ids[i]);
             b.atom_ids = mdz::share(std::move(ids));
             if (layout.types)
-                b.atom_types = mdz::share(f.types ? std::vector<std::int32_t>(f.types, f.types + n)
-                                                  : std::vector<std::int32_t>());
+                b.atom_types =
+                    mdz::share(f.types ? std::vector<std::int32_t>(f.types, f.types + n) : std::vector<std::int32_t>());
         } else {
             b.atom_ids = w->ids;
             b.atom_types = w->types;
@@ -539,7 +548,8 @@ int mdz_reader_open(const char* path, mdz_reader** out) {
             const mdz::ColumnDesc& d = c.desc;
             if (d.per_frame || is_reserved(d.name)) continue;
             if (d.dtype == mdz::Dtype::F32)
-                r->columns.push_back(Column{d.name, MDZ_FLOAT, d.width, d.lossy ? static_cast<double>(d.precision) : 0.0});
+                r->columns.push_back(
+                    Column{d.name, MDZ_FLOAT, d.width, d.lossy ? static_cast<double>(d.precision) : 0.0});
             else if (d.dtype == mdz::Dtype::I32)
                 r->columns.push_back(Column{d.name, MDZ_INT, d.width, 0.0});
         }
@@ -560,8 +570,8 @@ int64_t mdz_reader_frame_natoms(const mdz_reader* r, int64_t index) {
     const int rc = guard([&] {
         if (!r) invalid("reader is null");
         if (index < 0 || static_cast<std::uint64_t>(index) >= r->ct.nframes)
-            throw CError{MDZ_ERR_RANGE, "frame " + std::to_string(index) + " out of range (nframes = " +
-                                            std::to_string(r->ct.nframes) + ")"};
+            throw CError{MDZ_ERR_RANGE, "frame " + std::to_string(index) +
+                                            " out of range (nframes = " + std::to_string(r->ct.nframes) + ")"};
         n = static_cast<int64_t>(r->frame_natoms(static_cast<std::size_t>(index)));
     });
     return rc == MDZ_OK ? n : -1;
@@ -608,8 +618,8 @@ int mdz_reader_column(const mdz_reader* r, int64_t i, mdz_column* column) {
         if (!r) invalid("reader is null");
         if (!column) invalid("column is null");
         if (i < 0 || static_cast<std::uint64_t>(i) >= r->columns.size())
-            throw CError{MDZ_ERR_RANGE, "column " + std::to_string(i) + " out of range (ncolumns = " +
-                                            std::to_string(r->columns.size()) + ")"};
+            throw CError{MDZ_ERR_RANGE, "column " + std::to_string(i) +
+                                            " out of range (ncolumns = " + std::to_string(r->columns.size()) + ")"};
         const Column& c = r->columns[static_cast<std::size_t>(i)];
         column->name = c.name.c_str();
         column->type = c.type;
@@ -649,8 +659,8 @@ int mdz_reader_read_frame(mdz_reader* r, int64_t index, mdz_frame_out* frame) {
         mdz_frame_out& f = *frame;
         if (!big_enough(f)) invalid("frame.struct_size is too small: call mdz_frame_out_init");
         if (index < 0 || static_cast<std::uint64_t>(index) >= r->ct.nframes)
-            throw CError{MDZ_ERR_RANGE, "frame " + std::to_string(index) + " out of range (nframes = " +
-                                            std::to_string(r->ct.nframes) + ")"};
+            throw CError{MDZ_ERR_RANGE, "frame " + std::to_string(index) +
+                                            " out of range (nframes = " + std::to_string(r->ct.nframes) + ")"};
         const auto i = static_cast<std::size_t>(index);
         const std::size_t g = r->ct.gofs.overlapping(i, i + 1).start;
         const auto span = r->ct.gofs.span(g);
@@ -669,7 +679,8 @@ int mdz_reader_read_frame(mdz_reader* r, int64_t index, mdz_frame_out* frame) {
             if (!dst) return;
             const std::vector<float>* src = b.column(name);
             if (!src) invalid(std::string("file has no ") + name);
-            if (src->size() < (first + n) * 3) throw mdz::Error(mdz::ErrorKind::Corrupt, std::string(name) + " is short");
+            if (src->size() < (first + n) * 3)
+                throw mdz::Error(mdz::ErrorKind::Corrupt, std::string(name) + " is short");
             const float* s = src->data() + first * 3;
             for (std::size_t k = 0; k < n3; ++k) dst[k] = static_cast<double>(s[k]);
         };
@@ -678,7 +689,8 @@ int mdz_reader_read_frame(mdz_reader* r, int64_t index, mdz_frame_out* frame) {
         auto per_atom = [&](const char* column) -> const std::int32_t* {
             auto it = b.int_columns.find(column);
             if (it == b.int_columns.end()) return nullptr;
-            if (it->second.size() < first + n) throw mdz::Error(mdz::ErrorKind::Corrupt, std::string(column) + " is short");
+            if (it->second.size() < first + n)
+                throw mdz::Error(mdz::ErrorKind::Corrupt, std::string(column) + " is short");
             return it->second.data() + first;
         };
         if ((f.ids || f.types) && !r->ct.variable_atoms && !r->atoms_loaded) {
@@ -699,7 +711,7 @@ int mdz_reader_read_frame(mdz_reader* r, int64_t index, mdz_frame_out* frame) {
             }
         }
         if (f.types) {
-            const std::int32_t* types = r->ct.variable_atoms ? per_atom(mdz::columns::kType)
+            const std::int32_t* types = r->ct.variable_atoms                ? per_atom(mdz::columns::kType)
                                         : r->types && r->types->size() == n ? r->types->data()
                                                                             : nullptr;
             if (!types) invalid("file has no atom types");
@@ -719,7 +731,9 @@ int mdz_reader_read_frame(mdz_reader* r, int64_t index, mdz_frame_out* frame) {
             if (!dst) continue;
             const Column& col = r->columns[c];
             const std::size_t at = first * col.width, len = n * col.width;
-            auto short_column = [&] { throw mdz::Error(mdz::ErrorKind::Corrupt, "column '" + col.name + "' is short"); };
+            auto short_column = [&] {
+                throw mdz::Error(mdz::ErrorKind::Corrupt, "column '" + col.name + "' is short");
+            };
             if (col.type == MDZ_FLOAT) {
                 const std::vector<float>* src = b.column(col.name);
                 if (!src || src->size() < at + len) short_column();

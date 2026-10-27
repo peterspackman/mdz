@@ -105,7 +105,7 @@ Schema decode_schema(std::size_t natoms, ByteSpan bytes) {
 }
 
 struct ParsedRecord {
-    std::size_t total;    // bytes the record occupies
+    std::size_t total;  // bytes the record occupies
     std::size_t nframes;
     ByteSpan body;
     std::uint32_t crc;
@@ -278,8 +278,8 @@ Loaded load_container(std::shared_ptr<const void> keep, ByteSpan bytes) {
                                             " is not supported (this build reads version 4)");
     const std::uint16_t flags = c.u16();
     if (flags & ~kKnownFlags)
-        throw Error(ErrorKind::Corrupt, "file uses header flags " + std::to_string(flags) +
-                                            " that this build does not understand");
+        throw Error(ErrorKind::Corrupt,
+                    "file uses header flags " + std::to_string(flags) + " that this build does not understand");
     const std::uint64_t natoms64 = c.u64();
     if (natoms64 > SIZE_MAX / 64) corrupt("atom count too large");
     const std::size_t schema_len = c.u32();

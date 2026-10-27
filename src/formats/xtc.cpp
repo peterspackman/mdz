@@ -75,8 +75,7 @@ public:
                 begin_ = 0;
             }
             const std::size_t target = std::max(kReadChunk, std::min(n, end_ + kReadChunk));
-            if (buf_.size() < target)
-                buf_.resize(std::min(std::max(target, 2 * buf_.size()), std::max(n, kReadChunk)));
+            if (buf_.size() < target) buf_.resize(std::min(std::max(target, 2 * buf_.size()), std::max(n, kReadChunk)));
             const std::size_t got = in_.read(buf_.data() + end_, buf_.size() - end_);
             if (got == 0) eof_ = true;
             end_ += got;
@@ -132,8 +131,7 @@ public:
             Box box;
             for (std::size_t k = 0; k < 9; ++k) box[k] = static_cast<double>(load_be_f32(h + 16 + 4 * k));
             const std::size_t natoms2 = read_natoms(h + 52);
-            if (natoms2 != natoms)
-                bad("natoms mismatch: " + std::to_string(natoms) + " vs " + std::to_string(natoms2));
+            if (natoms2 != natoms) bad("natoms mismatch: " + std::to_string(natoms) + " vs " + std::to_string(natoms2));
             if (natoms != natoms_ || varying_) {
                 if (!b.variable()) b.frame_natoms.emplace(f, natoms_);
                 b.natoms = 0;
@@ -257,8 +255,8 @@ public:
             } else {
                 step = static_cast<std::int32_t>(static_cast<std::uint32_t>(g));
             }
-            const float time = times && f < times->size() ? static_cast<float>((*times)[f])
-                                                          : static_cast<float>(g) * 0.001f;
+            const float time =
+                times && f < times->size() ? static_cast<float>((*times)[f]) : static_cast<float>(g) * 0.001f;
 
             const std::size_t start = buf_.size();
             put_be_i32(buf_, kMagic);

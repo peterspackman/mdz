@@ -29,8 +29,8 @@
 
 namespace mdz {
 
-using detail::Bytes;
 using detail::ByteCursor;
+using detail::Bytes;
 using detail::corrupt;
 using detail::put_le;
 using detail::put_u8;
@@ -211,8 +211,7 @@ void check_shape(const FrameBatch& b) {
                     std::to_string(nframes) + " frames");
         if (b.frame_props.count(name)) invalid("frame property '" + name + "' is both a float and an integer");
     }
-    if (b.attributes.size() > 200)
-        invalid(std::to_string(b.attributes.size()) + " attributes; at most 200 are stored");
+    if (b.attributes.size() > 200) invalid(std::to_string(b.attributes.size()) + " attributes; at most 200 are stored");
     for (const auto& kv : b.attributes)
         if (kv.first.size() > 250) invalid("attribute name '" + kv.first + "' is longer than 250 bytes");
     auto meta = [&](const char* name, std::size_t len, bool present) {
@@ -250,8 +249,9 @@ ColumnDesc describe_xyz(ColumnDesc d, float precision, const CompressOptions& o)
     d.lossy = precision > 0.0f;
     d.pred_order = static_cast<std::uint8_t>(o.predictor_order);
     d.anchor_step = static_cast<std::uint8_t>(o.anchor_step);
-    d.codec_flags = static_cast<std::uint8_t>((o.adaptive ? kFlagAdaptive : 0) | (o.anchor_step > 1 ? kFlagBFrames : 0) |
-                                              (o.spatial_delta ? kFlagSpatialDelta : 0));
+    d.codec_flags =
+        static_cast<std::uint8_t>((o.adaptive ? kFlagAdaptive : 0) | (o.anchor_step > 1 ? kFlagBFrames : 0) |
+                                  (o.spatial_delta ? kFlagSpatialDelta : 0));
     return d;
 }
 
@@ -275,8 +275,8 @@ std::vector<Bytes> encode_xyz_groups(const float* data, std::size_t natoms, std:
     return blobs;
 }
 
-std::vector<Bytes> encode_scalar_groups(const float* data, std::size_t per_frame, std::size_t nframes,
-                                        std::size_t g, float precision, int level) {
+std::vector<Bytes> encode_scalar_groups(const float* data, std::size_t per_frame, std::size_t nframes, std::size_t g,
+                                        float precision, int level) {
     const std::size_t ngroups = (nframes + g - 1) / g;
     std::vector<Bytes> blobs(ngroups);
     detail::parallel_for(ngroups, [&](std::size_t i) {
@@ -289,8 +289,8 @@ std::vector<Bytes> encode_scalar_groups(const float* data, std::size_t per_frame
 }
 
 template <class T>
-std::vector<Bytes> encode_plain_groups(std::uint8_t tag, const T* data, std::size_t per_frame,
-                                       std::size_t nframes, std::size_t g, int level) {
+std::vector<Bytes> encode_plain_groups(std::uint8_t tag, const T* data, std::size_t per_frame, std::size_t nframes,
+                                       std::size_t g, int level) {
     const std::size_t ngroups = (nframes + g - 1) / g;
     std::vector<Bytes> blobs(ngroups);
     detail::parallel_for(ngroups, [&](std::size_t i) {
@@ -441,10 +441,14 @@ std::vector<std::size_t> CompressedTrajectory::frame_natoms(std::size_t start, s
 
 std::size_t DecodedColumn::size() const noexcept {
     switch (dtype) {
-        case Dtype::F64: return f64.size();
-        case Dtype::I32: return i32.size();
-        case Dtype::I64: return i64.size();
-        default: return f32.size();
+        case Dtype::F64:
+            return f64.size();
+        case Dtype::I32:
+            return i32.size();
+        case Dtype::I64:
+            return i64.size();
+        default:
+            return f32.size();
     }
 }
 
@@ -512,8 +516,8 @@ CompressedTrajectory compress(const FrameBatch& batch, const CompressOptions& us
         const std::size_t width = width_of(data.size(), natoms, nframes);
         ColumnDesc d = ColumnDesc::int_column(name);
         d.width = static_cast<std::uint32_t>(width);
-        ct.columns.emplace_back(std::move(d), encode_plain_groups(kTagInt32, data.data(), natoms * width, nframes,
-                                                                  opts.gof_size, level));
+        ct.columns.emplace_back(
+            std::move(d), encode_plain_groups(kTagInt32, data.data(), natoms * width, nframes, opts.gof_size, level));
     }
 
     // Per-frame columns get one blob per group, like the per-atom ones, so
@@ -618,7 +622,10 @@ namespace {
 DecodedColumn empty_of(Dtype dt, bool per_frame) {
     DecodedColumn d;
     if (per_frame)
-        d.dtype = dt == Dtype::U32 ? Dtype::I32 : (dt == Dtype::F32 || dt == Dtype::F64 || dt == Dtype::I32 || dt == Dtype::I64 ? dt : Dtype::F32);
+        d.dtype =
+            dt == Dtype::U32
+                ? Dtype::I32
+                : (dt == Dtype::F32 || dt == Dtype::F64 || dt == Dtype::I32 || dt == Dtype::I64 ? dt : Dtype::F32);
     else
         d.dtype = (dt == Dtype::I32 || dt == Dtype::U32) ? Dtype::I32 : Dtype::F32;
     return d;
@@ -736,7 +743,8 @@ DecodedColumn decode_column(const CompressedTrajectory& ct, const CompressedColu
             const auto s = gofs.span(g0 + k);
             offs[k] = total;
             total = detail::checked_add(
-                total, detail::checked_mul(std::min(end, s.end) - std::max(start, s.start), per_frame, "column too large"),
+                total,
+                detail::checked_mul(std::min(end, s.end) - std::max(start, s.start), per_frame, "column too large"),
                 "column too large");
         }
         // Bound the allocation by the compressed bytes present. A blob can
@@ -758,8 +766,8 @@ DecodedColumn decode_column(const CompressedTrajectory& ct, const CompressedColu
                                          ct.rigid.get());
             } else {
                 whole.resize(s.size() * per_frame);
-                detail::decode_f32_group(col, gi, s.size(), natoms, raw, tmp, whole.data(), lo - s.start,
-                                         hi - s.start, ct.rigid.get());
+                detail::decode_f32_group(col, gi, s.size(), natoms, raw, tmp, whole.data(), lo - s.start, hi - s.start,
+                                         ct.rigid.get());
                 if (per_frame)
                     std::memcpy(base + offs[k], whole.data() + (lo - s.start) * per_frame,
                                 (hi - lo) * per_frame * sizeof(float));
@@ -783,7 +791,8 @@ FrameBatch decompress(const CompressedTrajectory& ct, std::size_t start, std::si
                 if (!b.box->empty()) std::memcpy(b.box->data(), v.f64.data(), b.box->size() * 9 * sizeof(double));
             } else if (d.name == "origin" && d.width == 3 && v.dtype == Dtype::F64) {
                 b.origin.emplace(v.f64.size() / 3);
-                if (!b.origin->empty()) std::memcpy(b.origin->data(), v.f64.data(), b.origin->size() * 3 * sizeof(double));
+                if (!b.origin->empty())
+                    std::memcpy(b.origin->data(), v.f64.data(), b.origin->size() * 3 * sizeof(double));
             } else if (v.dtype == Dtype::F64) {
                 b.frame_props[d.name] = std::move(v.f64);
             } else if (v.dtype == Dtype::I32) {

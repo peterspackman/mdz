@@ -46,8 +46,10 @@ Bytes write(std::string_view format, const std::vector<mdz::FrameBatch>& batches
             std::size_t natoms = 0) {
     Bytes out;
     std::unique_ptr<mdz::OutputStream> s;
-    if (seekable) s = mdz::memory_output(&out);
-    else s = std::make_unique<PipeOutput>(&out);
+    if (seekable)
+        s = mdz::memory_output(&out);
+    else
+        s = std::make_unique<PipeOutput>(&out);
     if (natoms == 0 && !batches.empty()) natoms = batches[0].natoms;
     auto w = fmt(format).open_writer(std::move(s), natoms, {});
     for (const auto& b : batches) w->write_batch(b);
@@ -181,7 +183,9 @@ TEST(dcd_reads_big_endian) {
     // "CORD" and the title, which are left alone, and the cell values, which
     // are 8 bytes.
     Bytes be = le;
-    auto swap = [&](std::size_t at, std::size_t w) { std::reverse(be.begin() + static_cast<std::ptrdiff_t>(at), be.begin() + static_cast<std::ptrdiff_t>(at + w)); };
+    auto swap = [&](std::size_t at, std::size_t w) {
+        std::reverse(be.begin() + static_cast<std::ptrdiff_t>(at), be.begin() + static_cast<std::ptrdiff_t>(at + w));
+    };
     std::size_t at = 0;
     swap(0, 4);
     for (at = 8; at < 92; at += 4) swap(at, 4);
@@ -428,7 +432,8 @@ TEST(xtc_rejects_truncated_and_garbage) {
     const Bytes full = write("xtc", three);
     // XTC frames are self-contained, so the file is its frames concatenated.
     std::vector<std::size_t> ends;
-    for (std::size_t f = 0; f < 3; ++f) ends.push_back((ends.empty() ? 0 : ends.back()) + write("xtc", three.slice_frames(f, f + 1)).size());
+    for (std::size_t f = 0; f < 3; ++f)
+        ends.push_back((ends.empty() ? 0 : ends.back()) + write("xtc", three.slice_frames(f, f + 1)).size());
     CHECK_EQ(ends.back(), full.size());
     for (std::size_t cut = 0; cut < full.size(); ++cut) {
         Bytes head(full.begin(), full.begin() + static_cast<std::ptrdiff_t>(cut));
@@ -493,8 +498,7 @@ TEST(dcd_to_xtc_and_back) {
     for (std::size_t f = 0; f < 25; ++f) {
         CHECK_EQ(got.int_frame_props["step"][f], std::int64_t(f));
         CHECK_EQ(got.frame_props["time"][f], double(static_cast<float>(f) * 0.001f));
-        for (std::size_t k = 0; k < 9; ++k)
-            CHECK_EQ((*got.box)[f][k], double(static_cast<float>((*src->box)[f][k])));
+        for (std::size_t k = 0; k < 9; ++k) CHECK_EQ((*got.box)[f][k], double(static_cast<float>((*src->box)[f][k])));
     }
 }
 
@@ -520,7 +524,8 @@ TEST(npy_roundtrip) {
 
 TEST(npy_patched_and_buffered_headers_match) {
     auto all = sample(3, 1000);
-    std::vector<mdz::FrameBatch> parts = {all.slice_frames(0, 1), all.slice_frames(1, 999), all.slice_frames(999, 1000)};
+    std::vector<mdz::FrameBatch> parts = {all.slice_frames(0, 1), all.slice_frames(1, 999),
+                                          all.slice_frames(999, 1000)};
     const Bytes one = write("npy", all, false);
     CHECK(write("npy", parts) == one);
     CHECK(write("npy", parts, false) == one);
@@ -577,12 +582,12 @@ TEST(npy_rejects_bad_files) {
     CHECK(!corrupt(npy_bytes(ok, 12)));
     CHECK(corrupt(Bytes(5, 0)));
     CHECK(corrupt(Bytes(64, 0)));
-    CHECK(corrupt(npy_bytes(ok, 12, 3)));                               // version
-    CHECK(corrupt(npy_bytes(ok, 11)));                                  // short
-    CHECK(corrupt(npy_bytes(ok, 13)));                                  // long
+    CHECK(corrupt(npy_bytes(ok, 12, 3)));  // version
+    CHECK(corrupt(npy_bytes(ok, 11)));     // short
+    CHECK(corrupt(npy_bytes(ok, 13)));     // long
     Bytes odd = npy_bytes(ok, 12);
     odd.pop_back();
-    CHECK(corrupt(odd));                                                // not a whole number of floats
+    CHECK(corrupt(odd));  // not a whole number of floats
     odd = npy_bytes(ok, 12);
     odd.push_back(0);
     CHECK(corrupt(odd));

@@ -159,8 +159,10 @@ public:
                 // The first column is an element symbol. Use the element if
                 // present, then the atom name, then "X".
                 std::string_view name = "X";
-                if (elements && a < elements->size()) name = (*elements)[a];
-                else if (names && a < names->size()) name = (*names)[a];
+                if (elements && a < elements->size())
+                    name = (*elements)[a];
+                else if (names && a < names->size())
+                    name = (*names)[a];
                 w_.put(name);
                 for (int k = 0; k < 3; ++k)
                     w_.put(' ').put_fixed(static_cast<double>(p[3 * a + k]) * units::kNmToAngstrom, 6);

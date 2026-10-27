@@ -11,8 +11,10 @@ namespace mdz {
 std::optional<FrameBatch> TrajectoryReader::read_all() {
     std::optional<FrameBatch> all;
     while (auto b = read_batch(1000)) {
-        if (!all) all = std::move(b);
-        else all->append(*b);
+        if (!all)
+            all = std::move(b);
+        else
+            all->append(*b);
     }
     return all;
 }
@@ -41,18 +43,16 @@ std::vector<FormatInfo> builtin() {
         true, true, true, make_mdz_reader, make_mdz_writer);
     add("dcd", {"dcd"}, {"positions", "box"}, false, false, false, make_dcd_reader, make_dcd_writer);
     add("xtc", {"xtc"}, {"positions", "box", "time", "step"}, false, false, true, make_xtc_reader, make_xtc_writer);
-    add("extxyz", {"extxyz"},
-        {"positions", "velocities", "forces", "box", "atom_names", "time", "energy"}, true, false, true,
-        make_extxyz_reader, make_extxyz_writer);
+    add("extxyz", {"extxyz"}, {"positions", "velocities", "forces", "box", "atom_names", "time", "energy"}, true, false,
+        true, make_extxyz_reader, make_extxyz_writer);
     add("lammps", {"lammpstrj", "lammps", "dump"},
-        {"positions", "velocities", "forces", "box", "atom_types", "atom_ids", "elements", "step", "time", "origin"}, true,
-        false, true, make_lammps_reader, make_lammps_writer);
+        {"positions", "velocities", "forces", "box", "atom_types", "atom_ids", "elements", "step", "time", "origin"},
+        true, false, true, make_lammps_reader, make_lammps_writer);
     add("pdb", {"pdb"},
         {"positions", "box", "atom_names", "elements", "atom_ids", "occupancy", "bfactor", "residue_names",
          "residue_ids", "chain_ids", "hetatm"},
         false, false, true, make_pdb_reader, make_pdb_writer);
-    add("xyz", {"xyz"}, {"positions", "atom_names", "elements"}, false, false, true, make_xyz_reader,
-        make_xyz_writer);
+    add("xyz", {"xyz"}, {"positions", "atom_names", "elements"}, false, false, true, make_xyz_reader, make_xyz_writer);
     add("npy", {"npy"}, {"positions"}, false, false, false, make_npy_reader, make_npy_writer);
     return v;
 }
@@ -92,8 +92,10 @@ void register_format(FormatInfo info) {
     std::lock_guard<std::mutex> lock(table_mutex());
     auto& t = table();
     auto it = std::find_if(t.begin(), t.end(), [&](const FormatInfo& f) { return f.name == info.name; });
-    if (it != t.end()) *it = std::move(info);
-    else t.push_back(std::move(info));
+    if (it != t.end())
+        *it = std::move(info);
+    else
+        t.push_back(std::move(info));
 }
 
 const FormatInfo* find_format(std::string_view name) noexcept {
@@ -130,14 +132,15 @@ std::unique_ptr<TrajectoryWriter> open_writer(const std::string& path, std::size
 std::vector<std::string> check_data_loss(const FrameBatch& batch, std::string_view format) {
     const FormatInfo* f = find_format(format);
     std::set<std::string_view> supported;
-    if (f) supported.insert(f->supported.begin(), f->supported.end());
-    else supported.insert("positions");
+    if (f)
+        supported.insert(f->supported.begin(), f->supported.end());
+    else
+        supported.insert("positions");
     // extxyz stores atom ids as the integer property "id". They survive if the
     // batch has an "id" column, or if the batch is variable, in which case the
     // writer emits the ids as "id". A fixed batch without an "id" column loses
     // its ids.
-    if (f && f->name == "extxyz" && (batch.variable() || batch.int_columns.count("id")))
-        supported.insert("atom_ids");
+    if (f && f->name == "extxyz" && (batch.variable() || batch.int_columns.count("id"))) supported.insert("atom_ids");
     std::vector<std::string> lost;
     for (const std::string& d : batch.available_data()) {
         if (supported.count(d)) continue;

@@ -134,8 +134,8 @@ std::string_view detect_format(std::string_view path) noexcept;
 // be opened.
 std::unique_ptr<TrajectoryReader> open_reader(const std::string& path, std::string_view format = {},
                                               const FormatOptions& opts = {});
-std::unique_ptr<TrajectoryWriter> open_writer(const std::string& path, std::size_t natoms,
-                                              std::string_view format = {}, const FormatOptions& opts = {});
+std::unique_ptr<TrajectoryWriter> open_writer(const std::string& path, std::size_t natoms, std::string_view format = {},
+                                              const FormatOptions& opts = {});
 
 // The kinds of data in `batch` (as named by available_data()) that a writer
 // for `format` would not preserve. Empty if nothing would be lost.

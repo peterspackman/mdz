@@ -13,13 +13,13 @@ namespace {
 
 constexpr std::size_t kFirstIdx = 9;
 constexpr std::uint32_t kMagicInts[] = {
-    0,       0,       0,       0,       0,       0,       0,       0,       0,       8,       10,      12,
-    16,      20,      25,      32,      40,      50,      64,      80,      101,     128,     161,     203,
-    256,     322,     406,     512,     645,     812,     1024,    1290,    1625,    2048,    2580,    3250,
-    4096,    5060,    6501,    8192,    10321,   13003,   16384,   20642,   26007,   32768,   41285,   52015,
-    65536,   82570,   104031,  131072,  165140,  208063,  262144,  330280,  416127,  524287,  660561,  832255,
-    1048576, 1321122, 1664510, 2097152, 2642245, 3329021, 4194304, 5284491, 6658042, 8388607, 10568983, 13316085,
-    16777216};
+    0,       0,       0,       0,       0,        0,        0,       0,       0,       8,       10,
+    12,      16,      20,      25,      32,       40,       50,      64,      80,      101,     128,
+    161,     203,     256,     322,     406,      512,      645,     812,     1024,    1290,    1625,
+    2048,    2580,    3250,    4096,    5060,     6501,     8192,    10321,   13003,   16384,   20642,
+    26007,   32768,   41285,   52015,   65536,    82570,    104031,  131072,  165140,  208063,  262144,
+    330280,  416127,  524287,  660561,  832255,   1048576,  1321122, 1664510, 2097152, 2642245, 3329021,
+    4194304, 5284491, 6658042, 8388607, 10568983, 13316085, 16777216};
 constexpr std::size_t kNumMagic = sizeof(kMagicInts) / sizeof(kMagicInts[0]);
 
 std::uint32_t sizeofint(std::uint32_t size) noexcept {
@@ -206,14 +206,14 @@ struct BitReader {
                 // The result is meaningless either way, but it must not trap.
                 std::int32_t p = s > 0 ? num / s : 0;
                 bytes[j] = p;
-                num = wsub(num, static_cast<std::int32_t>(static_cast<std::uint32_t>(p) * static_cast<std::uint32_t>(s)));
+                num =
+                    wsub(num, static_cast<std::int32_t>(static_cast<std::uint32_t>(p) * static_cast<std::uint32_t>(s)));
             }
             nums[i] = num;
         }
-        nums[0] = static_cast<std::int32_t>(static_cast<std::uint32_t>(bytes[0]) |
-                                            (static_cast<std::uint32_t>(bytes[1]) << 8) |
-                                            (static_cast<std::uint32_t>(bytes[2]) << 16) |
-                                            (static_cast<std::uint32_t>(bytes[3]) << 24));
+        nums[0] = static_cast<std::int32_t>(
+            static_cast<std::uint32_t>(bytes[0]) | (static_cast<std::uint32_t>(bytes[1]) << 8) |
+            (static_cast<std::uint32_t>(bytes[2]) << 16) | (static_cast<std::uint32_t>(bytes[3]) << 24));
     }
 };
 
@@ -221,7 +221,8 @@ struct BitReader {
 
 std::int32_t read_be_i32(ByteCursor& c) {
     ByteSpan b = c.take(4);
-    return static_cast<std::int32_t>((static_cast<std::uint32_t>(b[0]) << 24) | (static_cast<std::uint32_t>(b[1]) << 16) |
+    return static_cast<std::int32_t>((static_cast<std::uint32_t>(b[0]) << 24) |
+                                     (static_cast<std::uint32_t>(b[1]) << 16) |
                                      (static_cast<std::uint32_t>(b[2]) << 8) | static_cast<std::uint32_t>(b[3]));
 }
 float read_be_f32(ByteCursor& c) {
@@ -266,7 +267,8 @@ void xdr3d_encode(const float* coords, std::size_t natoms, float precision, std:
             float r = v >= 0.0f ? scaled + 0.5f : scaled - 0.5f;
             // r lies in (-2^31 - 1, 2^31 + 1). Clamp values that rounding pushed
             // outside the i32 range.
-            std::int32_t lint = r >= 2147483648.0f ? INT32_MAX : (r <= -2147483904.0f ? INT32_MIN : static_cast<std::int32_t>(r));
+            std::int32_t lint =
+                r >= 2147483648.0f ? INT32_MAX : (r <= -2147483904.0f ? INT32_MIN : static_cast<std::int32_t>(r));
             ic[i * 3 + j] = lint;
             if (lint < minint[j]) minint[j] = lint;
             if (lint > maxint[j]) maxint[j] = lint;
@@ -535,8 +537,8 @@ std::size_t xdr3d_decode(ByteSpan in, std::size_t natoms, std::vector<std::int32
         sizesmall[0] = sizesmall[1] = sizesmall[2] = kMagicInts[smallidx];
     }
     if (nout != total)
-        throw Error(ErrorKind::Corrupt, "XTC decode produced " + std::to_string(nout) + " floats, expected " +
-                                            std::to_string(total));
+        throw Error(ErrorKind::Corrupt,
+                    "XTC decode produced " + std::to_string(nout) + " floats, expected " + std::to_string(total));
     return cur.offset();
 }
 

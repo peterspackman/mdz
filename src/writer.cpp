@@ -161,8 +161,7 @@ Writer Writer::append(const std::string& path, CompressOptions opts) {
         auto f = detail::MappedFile::open(path);
         ByteSpan b = f->bytes();
         if (b.size() < 4 || b[0] != 'M' || b[1] != 'D' || b[2] != 'Z' || b[3] != 4)
-            throw Error(ErrorKind::InvalidInput,
-                        path + " is not a .mdz file, so it cannot be appended to");
+            throw Error(ErrorKind::InvalidInput, path + " is not a .mdz file, so it cannot be appended to");
         detail::Loaded L = detail::load_container(f, b);
         schema = detail::Schema::of(L.ct);
         index = std::move(L.index);
@@ -193,10 +192,11 @@ void Writer::write(const FrameBatch& batch) {
     if (!w.opts.variable_atoms) {
         const std::size_t have = w.schema ? w.schema->natoms : (w.pending ? w.pending->natoms : batch.natoms);
         if (batch.variable() || batch.natoms != have)
-            throw Error(ErrorKind::InvalidInput,
-                        "batch has " + (batch.variable() ? std::string("a varying number of") : std::to_string(batch.natoms)) +
-                            " atoms; the file has " + std::to_string(have) +
-                            ". To let the atom count change, set CompressOptions::variable_atoms when creating the file");
+            throw Error(
+                ErrorKind::InvalidInput,
+                "batch has " + (batch.variable() ? std::string("a varying number of") : std::to_string(batch.natoms)) +
+                    " atoms; the file has " + std::to_string(have) +
+                    ". To let the atom count change, set CompressOptions::variable_atoms when creating the file");
     }
     if (w.pending) {
         w.pending->append(batch);
@@ -239,8 +239,6 @@ std::uint64_t Writer::frames_written() const noexcept {
 }
 std::uint64_t Writer::frames_committed() const noexcept { return impl_->frames; }
 bool Writer::closed() const noexcept { return impl_->finished; }
-const FrameBatch* Writer::appended_metadata() const noexcept {
-    return impl_->appended ? &*impl_->appended : nullptr;
-}
+const FrameBatch* Writer::appended_metadata() const noexcept { return impl_->appended ? &*impl_->appended : nullptr; }
 
 }  // namespace mdz

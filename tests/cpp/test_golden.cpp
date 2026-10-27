@@ -84,10 +84,14 @@ Case load_case(const fs::path& dir) {
     for (const auto& e : fs::directory_iterator(dir)) {
         const std::string f = e.path().filename().string();
         auto stem = [&](std::size_t pre, std::size_t suf) { return f.substr(pre, f.size() - pre - suf); };
-        if (f.rfind("col.", 0) == 0) c.batch.columns[stem(4, 4)] = read_array<float>(e.path());
-        else if (f.rfind("icol.", 0) == 0) c.batch.int_columns[stem(5, 4)] = read_array<std::int32_t>(e.path());
-        else if (f.rfind("prop.", 0) == 0) c.batch.frame_props[stem(5, 4)] = read_array<double>(e.path());
-        else if (f.rfind("iprop.", 0) == 0) c.batch.int_frame_props[stem(6, 4)] = read_array<std::int64_t>(e.path());
+        if (f.rfind("col.", 0) == 0)
+            c.batch.columns[stem(4, 4)] = read_array<float>(e.path());
+        else if (f.rfind("icol.", 0) == 0)
+            c.batch.int_columns[stem(5, 4)] = read_array<std::int32_t>(e.path());
+        else if (f.rfind("prop.", 0) == 0)
+            c.batch.frame_props[stem(5, 4)] = read_array<double>(e.path());
+        else if (f.rfind("iprop.", 0) == 0)
+            c.batch.int_frame_props[stem(6, 4)] = read_array<std::int64_t>(e.path());
         else if (f == "box.f64") {
             auto v = read_array<double>(e.path());
             c.batch.box.emplace(v.size() / 9);
@@ -96,8 +100,10 @@ Case load_case(const fs::path& dir) {
             auto v = read_array<double>(e.path());
             c.batch.origin.emplace(v.size() / 3);
             std::memcpy(c.batch.origin->data(), v.data(), v.size() * 8);
-        } else if (f == "atom_types.i32") c.batch.atom_types = mdz::share(read_array<std::int32_t>(e.path()));
-        else if (f == "atom_ids.i32") c.batch.atom_ids = mdz::share(read_array<std::int32_t>(e.path()));
+        } else if (f == "atom_types.i32")
+            c.batch.atom_types = mdz::share(read_array<std::int32_t>(e.path()));
+        else if (f == "atom_ids.i32")
+            c.batch.atom_ids = mdz::share(read_array<std::int32_t>(e.path()));
         else if (f == "atom_names.txt") {
             std::vector<std::string> names;
             std::ifstream in(e.path());
@@ -163,8 +169,8 @@ TEST(golden_compress_is_byte_identical) {
         if (got != want) {
             std::size_t at = 0;
             while (at < got.size() && at < want.size() && got[at] == want[at]) ++at;
-            std::fprintf(stderr, "  %s: %zu bytes vs %zu, first difference at %zu\n",
-                         dir.filename().string().c_str(), got.size(), want.size(), at);
+            std::fprintf(stderr, "  %s: %zu bytes vs %zu, first difference at %zu\n", dir.filename().string().c_str(),
+                         got.size(), want.size(), at);
             CHECK(got == want);
         }
     }

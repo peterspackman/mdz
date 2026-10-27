@@ -47,8 +47,10 @@ public:
         std::setvbuf(f_, nullptr, _IOFBF, 1 << 20);
     }
     ~FileOutput() override {
-        if (f_ && owned_) std::fclose(f_);
-        else if (f_) std::fflush(f_);
+        if (f_ && owned_)
+            std::fclose(f_);
+        else if (f_)
+            std::fflush(f_);
     }
     void write(const void* d, std::size_t n) override {
         if (n && std::fwrite(d, 1, n, f_) != n) io_fail(name_, "write failed");

@@ -75,13 +75,21 @@ nb::object as_numpy(nb::handle obj, const char* dtype);
 template <class T>
 const char* dtype_name_of();
 template <>
-inline const char* dtype_name_of<float>() { return "float32"; }
+inline const char* dtype_name_of<float>() {
+    return "float32";
+}
 template <>
-inline const char* dtype_name_of<double>() { return "float64"; }
+inline const char* dtype_name_of<double>() {
+    return "float64";
+}
 template <>
-inline const char* dtype_name_of<std::int64_t>() { return "int64"; }
+inline const char* dtype_name_of<std::int64_t>() {
+    return "int64";
+}
 template <>
-inline const char* dtype_name_of<std::int32_t>() { return "int32"; }
+inline const char* dtype_name_of<std::int32_t>() {
+    return "int32";
+}
 
 template <class T>
 Array<T> as_array(nb::handle obj) {

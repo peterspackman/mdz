@@ -101,8 +101,8 @@ std::vector<std::int32_t> get_i32_array(ByteCursor& c) {
 }  // namespace
 
 bool Metadata::empty() const noexcept {
-    return !atom_names && !elements && !atom_types && !atom_ids && !residues && !residue_ids && !chain_ids &&
-           !hetatm && !bodies && !source_format && attributes.empty();
+    return !atom_names && !elements && !atom_types && !atom_ids && !residues && !residue_ids && !chain_ids && !hetatm &&
+           !bodies && !source_format && attributes.empty();
 }
 
 std::vector<std::uint8_t> Metadata::encode() const {
@@ -144,8 +144,8 @@ std::vector<std::uint8_t> Metadata::encode() const {
         fields.push_back(std::move(f));
     }
     if (fields.size() > 255)
-        throw Error(ErrorKind::InvalidInput, std::to_string(fields.size()) +
-                                                 " metadata fields (atom data plus attributes); at most 255 fit");
+        throw Error(ErrorKind::InvalidInput,
+                    std::to_string(fields.size()) + " metadata fields (atom data plus attributes); at most 255 fit");
     Bytes out;
     put_u8(out, kVersion);
     put_u8(out, static_cast<std::uint8_t>(fields.size()));
@@ -172,21 +172,32 @@ Metadata Metadata::decode(ByteSpan data) {
         std::uint8_t tag = c.u8();
         if (tag == kTagStringArray) {
             auto v = get_string_array(c);
-            if (key == "atom_names") m.atom_names = std::move(v);
-            else if (key == "elements") m.elements = std::move(v);
-            else if (key == "residues") m.residues = std::move(v);
-            else if (key == "chain_ids") m.chain_ids = std::move(v);
+            if (key == "atom_names")
+                m.atom_names = std::move(v);
+            else if (key == "elements")
+                m.elements = std::move(v);
+            else if (key == "residues")
+                m.residues = std::move(v);
+            else if (key == "chain_ids")
+                m.chain_ids = std::move(v);
         } else if (tag == kTagI32Array) {
             auto v = get_i32_array(c);
-            if (key == "atom_types") m.atom_types = std::move(v);
-            else if (key == "atom_ids") m.atom_ids = std::move(v);
-            else if (key == "residue_ids") m.residue_ids = std::move(v);
-            else if (key == "hetatm") m.hetatm = std::move(v);
-            else if (key == "bodies") m.bodies = std::move(v);
+            if (key == "atom_types")
+                m.atom_types = std::move(v);
+            else if (key == "atom_ids")
+                m.atom_ids = std::move(v);
+            else if (key == "residue_ids")
+                m.residue_ids = std::move(v);
+            else if (key == "hetatm")
+                m.hetatm = std::move(v);
+            else if (key == "bodies")
+                m.bodies = std::move(v);
         } else if (tag == kTagString) {
             std::string v = get_string(c);
-            if (key == "source_format") m.source_format = std::move(v);
-            else if (key.substr(0, 5) == "attr.") m.attributes[std::string(key.substr(5))] = std::move(v);
+            if (key == "source_format")
+                m.source_format = std::move(v);
+            else if (key.substr(0, 5) == "attr.")
+                m.attributes[std::string(key.substr(5))] = std::move(v);
         } else {
             corrupt("unknown metadata tag " + std::to_string(tag));
         }

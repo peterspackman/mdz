@@ -19,11 +19,16 @@ CodecMode parse_codec_mode(std::string_view s) {
 
 std::string_view codec_mode_name(CodecMode m) noexcept {
     switch (m) {
-        case CodecMode::Temporal: return "temporal";
-        case CodecMode::Intra: return "intra";
-        case CodecMode::Lossless: return "lossless";
-        case CodecMode::Rigid: return "rigid";
-        case CodecMode::Auto: return "auto";
+        case CodecMode::Temporal:
+            return "temporal";
+        case CodecMode::Intra:
+            return "intra";
+        case CodecMode::Lossless:
+            return "lossless";
+        case CodecMode::Rigid:
+            return "rigid";
+        case CodecMode::Auto:
+            return "auto";
     }
     return "?";
 }

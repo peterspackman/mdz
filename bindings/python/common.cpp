@@ -22,10 +22,16 @@ void register_error_translator() {
         } catch (const Error& e) {
             PyObject* type = PyExc_OSError;
             switch (e.kind()) {
-                case ErrorKind::InvalidInput: type = PyExc_ValueError; break;
-                case ErrorKind::OutOfRange: type = PyExc_IndexError; break;
+                case ErrorKind::InvalidInput:
+                    type = PyExc_ValueError;
+                    break;
+                case ErrorKind::OutOfRange:
+                    type = PyExc_IndexError;
+                    break;
                 case ErrorKind::Io:
-                case ErrorKind::Corrupt: type = PyExc_OSError; break;
+                case ErrorKind::Corrupt:
+                    type = PyExc_OSError;
+                    break;
             }
             PyErr_SetString(type, e.what());
         }
@@ -57,8 +63,7 @@ std::string fmt_shape(const std::vector<std::size_t>& shape) {
 
 void check_positions(const Array<float>& a) {
     const auto s = a.shape();
-    if (s.size() != 3 || s[2] != 3)
-        value_error("positions must have shape (nframes, natoms, 3), got " + fmt_shape(s));
+    if (s.size() != 3 || s[2] != 3) value_error("positions must have shape (nframes, natoms, 3), got " + fmt_shape(s));
     if (s[0] == 0 || s[1] == 0)
         value_error("positions must have at least one frame and one atom, got shape " + fmt_shape(s));
 }
@@ -86,15 +91,22 @@ nb::object column_to_numpy(DecodedColumn&& d, const ColumnDesc& desc, std::size_
     std::vector<std::size_t> shape;
     if (variable && !desc.per_frame) {
         const std::size_t atoms = d.size() / (w ? w : 1);
-        if (w == 1) shape = {atoms};
-        else shape = {atoms, w};
+        if (w == 1)
+            shape = {atoms};
+        else
+            shape = {atoms, w};
     } else if (desc.per_frame) {
-        if (w == 1) shape = {nframes};
-        else if (w == 9 && desc.name == "box") shape = {nframes, 3, 3};
-        else shape = {nframes, w};
+        if (w == 1)
+            shape = {nframes};
+        else if (w == 9 && desc.name == "box")
+            shape = {nframes, 3, 3};
+        else
+            shape = {nframes, w};
     } else {
-        if (w == 1) shape = {nframes, natoms};
-        else shape = {nframes, natoms, w};
+        if (w == 1)
+            shape = {nframes, natoms};
+        else
+            shape = {nframes, natoms, w};
     }
     std::size_t expected = 1;
     for (std::size_t s : shape) expected *= s;
@@ -102,10 +114,14 @@ nb::object column_to_numpy(DecodedColumn&& d, const ColumnDesc& desc, std::size_
         value_error("decoded " + std::to_string(d.size()) + " values, expected " + std::to_string(expected) +
                     " for shape " + fmt_shape(shape));
     switch (d.dtype) {
-        case Dtype::F64: return to_numpy(std::move(d.f64), shape);
-        case Dtype::I32: return to_numpy(std::move(d.i32), shape);
-        case Dtype::I64: return to_numpy(std::move(d.i64), shape);
-        default: return to_numpy(std::move(d.f32), shape);
+        case Dtype::F64:
+            return to_numpy(std::move(d.f64), shape);
+        case Dtype::I32:
+            return to_numpy(std::move(d.i32), shape);
+        case Dtype::I64:
+            return to_numpy(std::move(d.i64), shape);
+        default:
+            return to_numpy(std::move(d.f32), shape);
     }
 }
 
