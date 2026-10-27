@@ -156,7 +156,7 @@ jobs:
         run: |
           dir="mdz-${GITHUB_REF_NAME}-${NAME}"
           mkdir "$dir"
-          cp README.md LICENSE "$dir/"
+          cp README.md LICENSE THIRD_PARTY_LICENSES "$dir/"
           if [[ "$NAME" == windows-* ]]; then
             bin=build/cli/Release/mdz.exe
             cp "$bin" "$dir/"

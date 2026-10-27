@@ -7,8 +7,8 @@ name = "mdz"
 dynamic = ["version"]
 description = "Molecular dynamics trajectory compression with fast random access"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND BSD-3-Clause"
+license-files = ["LICENSE", "THIRD_PARTY_LICENSES"]
 authors = [{ name = "Peter Spackman", email = "peterspackman@fastmail.com" }]
 requires-python = ">=3.10"
 keywords = ["molecular-dynamics", "compression", "trajectory", "science"]
