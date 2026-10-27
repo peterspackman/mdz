@@ -78,6 +78,7 @@ jobs:
     needs: test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-14, windows-latest]
     steps:
@@ -88,7 +89,7 @@ jobs:
           CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_i686"
           CIBW_TEST_REQUIRES: numpy pytest
           CIBW_TEST_COMMAND: python -m pytest {project}/tests -q
-          MACOSX_DEPLOYMENT_TARGET: "10.15"
+          MACOSX_DEPLOYMENT_TARGET: "14.0"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: wheels-${{ matrix.os }}
@@ -114,6 +115,7 @@ jobs:
     needs: test
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Linux binaries are built in Alpine and linked statically against
@@ -146,7 +148,7 @@ jobs:
           case "$NAME" in
             # Static CRT, so the .exe does not need the VC++ runtime.
             windows-*) extra="-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded" ;;
-            macos-*) extra="-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15" ;;
+            macos-*) extra="-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0" ;;
           esac
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMDZ_BUILD_TESTS=OFF -DMDZ_BUILD_BENCH=OFF $extra
           cmake --build build --config Release --parallel --target mdz_cli
