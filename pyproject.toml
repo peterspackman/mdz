@@ -26,9 +26,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/peterspackman/mdz-cpp"
-Repository = "https://github.com/peterspackman/mdz-cpp"
-Issues = "https://github.com/peterspackman/mdz-cpp/issues"
+Homepage = "https://github.com/peterspackman/mdz"
+Repository = "https://github.com/peterspackman/mdz"
+Issues = "https://github.com/peterspackman/mdz/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

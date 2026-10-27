@@ -19,7 +19,7 @@ pip install mdz
 ```
 
 Prebuilt `mdz` binaries are on the
-[releases page](https://github.com/peterspackman/mdz-cpp/releases). To build
+[releases page](https://github.com/peterspackman/mdz/releases). To build
 from source you need CMake 3.18+ and a C++17 compiler:
 
 ```bash

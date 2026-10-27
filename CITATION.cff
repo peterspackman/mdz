@@ -12,8 +12,8 @@ authors:
   - family-names: Spackman
     given-names: Peter
     email: peterspackman@fastmail.com
-repository-code: "https://github.com/peterspackman/mdz-cpp"
-url: "https://github.com/peterspackman/mdz-cpp"
+repository-code: "https://github.com/peterspackman/mdz"
+url: "https://github.com/peterspackman/mdz"
 license: MIT
 version: 0.4.0
 keywords:
