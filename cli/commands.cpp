@@ -13,6 +13,7 @@
 #include <set>
 
 #include "io.hpp"
+#include "paths.hpp"
 #include "ui.hpp"
 
 namespace fs = std::filesystem;
@@ -26,7 +27,7 @@ double seconds_since(std::chrono::steady_clock::time_point t) {
 
 std::uint64_t file_size(const std::string& path) {
     std::error_code ec;
-    auto n = fs::file_size(fs::u8path(path), ec);
+    auto n = fs::file_size(utf8_path(path), ec);
     return ec ? 0 : n;
 }
 
@@ -380,7 +381,7 @@ int cmd_decompress(const Args& a) {
     Output out = Output::resolve(output, format);
     if (!out.to_stdout) {
         std::error_code ec;
-        if (fs::exists(fs::u8path(out.path), ec) && !a.has("force") && defaulted && !format && recorded) {
+        if (fs::exists(utf8_path(out.path), ec) && !a.has("force") && defaulted && !format && recorded) {
             fail(out.path + " already exists (use --force to overwrite)\n       (this .mdz was compressed from " +
                  *recorded + ", so that is the default output format; pass -o to write somewhere else)");
         }
@@ -443,11 +444,11 @@ int cmd_extract(const Args& a) {
     std::string output = a.get("output");
     if (!a.has("output")) {
         const std::string ext = format ? format_ext(*format) : source_format(r).value_or("extxyz");
-        fs::path p = fs::u8path(input);
-        std::string stem = p.stem().u8string();
+        fs::path p = utf8_path(input);
+        std::string stem = utf8_string(p.stem());
         if (stem.empty()) stem = "frames";
         output =
-            (p.parent_path() / (stem + "-" + std::to_string(start) + "-" + std::to_string(end) + "." + ext)).u8string();
+            utf8_string(p.parent_path() / (stem + "-" + std::to_string(start) + "-" + std::to_string(end) + "." + ext));
     }
     Output out = Output::resolve(output, format);
     out.ensure_writable({input}, a.has("force"));
@@ -550,7 +551,7 @@ struct DcdHeader {
 
 // Read only the DCD header. The DCD reader returns frames, not these fields.
 DcdHeader read_dcd_header(const std::string& path) {
-    std::ifstream f(fs::u8path(path), std::ios::binary);
+    std::ifstream f(utf8_path(path), std::ios::binary);
     std::vector<unsigned char> b(8192);
     f.read(reinterpret_cast<char*>(b.data()), static_cast<std::streamsize>(b.size()));
     b.resize(static_cast<std::size_t>(f.gcount()));

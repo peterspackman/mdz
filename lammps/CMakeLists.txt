@@ -1,7 +1,8 @@
 # Builds mdzplugin.so, a LAMMPS plugin that adds "dump mdz".
 #
 #   cmake -S lammps -B build-plugin -D LAMMPS_SOURCE_DIR=/path/to/lammps/src \
-#         [-D BUILD_MPI=off]   # must match the LAMMPS binary
+#         [-D BUILD_MPI=off]            # must match the LAMMPS binary
+#         [-D CMAKE_CXX_STANDARD=20]    # likewise; KOKKOS builds use C++20
 #   cmake --build build-plugin
 #
 # Then, in a LAMMPS input script:  plugin load /path/to/mdzplugin.so
@@ -27,8 +28,6 @@ set(LAMMPS_HEADER_DIR ${LAMMPS_SOURCE_DIR})
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Use LAMMPS's plugin support for header paths, MPI (or its serial stubs) and
 # integer size settings, so the plugin matches the binary that loads it.
@@ -52,6 +51,10 @@ add_subdirectory(${MDZ_ROOT} ${CMAKE_BINARY_DIR}/mdz EXCLUDE_FROM_ALL)
 # --- plugin ---
 add_library(mdzplugin MODULE mdzplugin.cpp dump_mdz.cpp)
 target_include_directories(mdzplugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+# LAMMPS's headers differ between C++17 and C++20 (fmt or std::format), so
+# the plugin must use the standard LAMMPS was built with; set
+# CMAKE_CXX_STANDARD to match it. C++17 is the minimum.
+target_compile_features(mdzplugin PRIVATE cxx_std_17)
 # LAMMPS symbols stay undefined and resolve against the loading binary.
 target_link_libraries(mdzplugin PRIVATE lammps mdz::mdz ${CMAKE_DL_LIBS})
 if(NOT MDZ_PARALLEL)

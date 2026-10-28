@@ -13,6 +13,15 @@ namespace {
     const int e = errno;
     throw Error(ErrorKind::Io, path + ": " + what + (e ? std::string(": ") + std::strerror(e) : std::string()));
 }
+
+// fs::u8path is deprecated in C++20; this builds as C++17 or later.
+std::filesystem::path utf8_path(const std::string& s) {
+#if defined(__cpp_lib_char8_t)
+    return std::filesystem::path(std::u8string(s.begin(), s.end()));
+#else
+    return std::filesystem::u8path(s);
+#endif
+}
 }  // namespace
 
 OutFile::OutFile(const std::string& path, const char* mode) : path_(path) {
@@ -51,7 +60,7 @@ void OutFile::close() {
 
 void resize_file(const std::string& path, std::uint64_t size) {
     std::error_code ec;
-    std::filesystem::resize_file(std::filesystem::u8path(path), size, ec);
+    std::filesystem::resize_file(utf8_path(path), size, ec);
     if (ec) {
         std::string msg = path + ": cannot resize: " + ec.message();
 #ifdef _WIN32

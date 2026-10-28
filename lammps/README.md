@@ -30,7 +30,15 @@ cmake -S lammps -B build-plugin \
 cmake --build build-plugin
 ```
 
-This builds the mdz library from this repository (C++17; its one
+Use the same compiler and C++ standard as the LAMMPS build. LAMMPS's
+headers change with the standard: built as C++20 they use `std::format`
+in place of the bundled fmt library, and a plugin built as C++17 against
+such a binary fails to load with an `undefined symbol` error naming
+`LAMMPS_NS::Error`. LAMMPS builds with the KOKKOS package use C++20, so add
+`-D CMAKE_CXX_STANDARD=20` for those. The LAMMPS configure summary prints
+the standard it used ("C++ Standard").
+
+This builds the mdz library from this repository (C++17 or later; its one
 dependency, zstd, is downloaded and compiled in) and links it statically
 into `build-plugin/mdzplugin.so`. To use an installed zstd instead, add
 `-D MDZ_ZSTD=system`.

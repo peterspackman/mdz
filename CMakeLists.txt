@@ -23,8 +23,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -73,6 +71,8 @@ set(MDZ_SOURCES
 
 add_library(mdz ${MDZ_SOURCES})
 add_library(mdz::mdz ALIAS mdz)
+# C++17 at least; a newer standard set by the compiler or CMAKE_CXX_STANDARD is kept.
+target_compile_features(mdz PUBLIC cxx_std_17)
 target_include_directories(mdz
   PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
           $<INSTALL_INTERFACE:include>

@@ -7,6 +7,7 @@
 #include <cstring>
 #include <filesystem>
 
+#include "paths.hpp"
 #include "signals.hpp"
 #include "ui.hpp"
 
@@ -30,7 +31,7 @@ const mdz::LammpsUnits* g_lammps_units = nullptr;
 const char* const kOutputExtensions =
     ".extxyz, .xyz, .pdb, .lammpstrj (or .lammps, .dump), .dcd, .xtc, .npy, and .f32/.bin/.raw for raw float32";
 
-fs::path P(const std::string& s) { return fs::u8path(s); }
+fs::path P(const std::string& s) { return utf8_path(s); }
 
 // Headerless little-endian float32 positions, in nm.
 class RawReader final : public mdz::TrajectoryReader {
@@ -119,7 +120,7 @@ void sync_file(const std::string& path) {
 }  // namespace
 
 std::string ext_lower(const std::string& path) {
-    std::string e = P(path).extension().u8string();
+    std::string e = utf8_string(P(path).extension());
     if (!e.empty() && e[0] == '.') e.erase(0, 1);
     for (char& c : e) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return e;
@@ -130,7 +131,7 @@ bool is_stdio(const std::string& path) { return path == "-"; }
 std::string with_extension(const std::string& path, const std::string& ext) {
     fs::path p = P(path);
     p.replace_extension(ext);
-    return p.u8string();
+    return utf8_string(p);
 }
 
 void ensure_writable(const std::string& output, const std::vector<std::string>& inputs, bool force) {
@@ -308,7 +309,7 @@ void write_atomically(const std::string& path, const std::function<void(const st
 #else
     const long pid = static_cast<long>(getpid());
 #endif
-    TempFile tmp((dir / ("." + dest.filename().u8string() + ".tmp-" + std::to_string(pid))).u8string());
+    TempFile tmp(utf8_string(dir / ("." + utf8_string(dest.filename()) + ".tmp-" + std::to_string(pid))));
     write(tmp.path());
     std::error_code ec;
     auto st = fs::status(dest, ec);

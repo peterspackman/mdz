@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "mdz/error.hpp"
+#include "paths.hpp"
 #include "ui.hpp"
 
 #if defined(_WIN32)
@@ -119,7 +120,7 @@ void TempFile::rename_into(const std::string& dest) {
     std::lock_guard<std::mutex> l(g_lock);
     if (g_interrupted.load()) throw mdz::Error(mdz::ErrorKind::Io, "interrupted");
     std::error_code ec;
-    std::filesystem::rename(std::filesystem::u8path(path_), std::filesystem::u8path(dest), ec);
+    std::filesystem::rename(utf8_path(path_), utf8_path(dest), ec);
     if (ec) throw mdz::Error(mdz::ErrorKind::Io, "renaming " + path_ + " to " + dest + ": " + ec.message());
     g_used[slot_].store(false);
     done_ = true;
