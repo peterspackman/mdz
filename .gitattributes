@@ -7,3 +7,4 @@
 tests/cpp/fixtures/** -text
 tests/cpp/golden/** -text
 examples/** -text
+bindings/js/test/fixtures/** -text

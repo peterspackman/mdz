@@ -9,10 +9,20 @@ else()
   set(MDZ_TOP_LEVEL OFF)
 endif()
 
-option(MDZ_BUILD_CLI "Build the mdz command-line tool" ${MDZ_TOP_LEVEL})
-option(MDZ_BUILD_TESTS "Build the C++ tests" ${MDZ_TOP_LEVEL})
-option(MDZ_BUILD_BENCH "Build the benchmarks" ${MDZ_TOP_LEVEL})
+# Under emscripten only the library and the JavaScript package make sense.
+if(EMSCRIPTEN)
+  set(MDZ_NATIVE_DEFAULT OFF)
+  set(MDZ_JS_DEFAULT ${MDZ_TOP_LEVEL})
+else()
+  set(MDZ_NATIVE_DEFAULT ${MDZ_TOP_LEVEL})
+  set(MDZ_JS_DEFAULT OFF)
+endif()
+
+option(MDZ_BUILD_CLI "Build the mdz command-line tool" ${MDZ_NATIVE_DEFAULT})
+option(MDZ_BUILD_TESTS "Build the C++ tests" ${MDZ_NATIVE_DEFAULT})
+option(MDZ_BUILD_BENCH "Build the benchmarks" ${MDZ_NATIVE_DEFAULT})
 option(MDZ_BUILD_PYTHON "Build the Python extension (nanobind)" OFF)
+option(MDZ_BUILD_JS "Build the JavaScript/WebAssembly package (emscripten only)" ${MDZ_JS_DEFAULT})
 option(MDZ_UNITY_BUILD "Compile the library as a few large translation units" OFF)
 option(MDZ_FUZZ "Build the fuzz targets (libFuzzer with clang)" OFF)
 option(MDZ_SANITIZE "Build with address and undefined-behaviour sanitizers" OFF)
@@ -126,6 +136,14 @@ endfunction()
 mdz_strict_fp(mdz)
 mdz_warnings(mdz)
 
+# mdz reports every error by throwing. Emscripten ignores exceptions unless
+# told otherwise, so use native wasm exceptions in the library and in
+# everything that links it.
+if(EMSCRIPTEN)
+  target_compile_options(mdz PUBLIC -fwasm-exceptions)
+  target_link_options(mdz PUBLIC -fwasm-exceptions)
+endif()
+
 if(MDZ_SANITIZE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address,undefined)
@@ -154,6 +172,13 @@ endif()
 
 if(MDZ_BUILD_PYTHON)
   add_subdirectory(bindings/python)
+endif()
+
+if(MDZ_BUILD_JS)
+  if(NOT EMSCRIPTEN)
+    message(FATAL_ERROR "MDZ_BUILD_JS needs emscripten: configure with emcmake cmake")
+  endif()
+  add_subdirectory(bindings/js)
 endif()
 
 # ---- install ---------------------------------------------------------------

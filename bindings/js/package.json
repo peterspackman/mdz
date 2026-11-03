@@ -1,0 +1,39 @@
+{
+  "name": "@peterspackman/mdz",
+  "version": "0.4.0",
+  "description": "Read .mdz molecular dynamics trajectories in browsers and Node (WebAssembly)",
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "dist/mdz_core.mjs",
+    "dist/mdz_core.wasm",
+    "dist/mdz_core.d.ts",
+    "dist/LICENSE",
+    "dist/THIRD_PARTY_LICENSES"
+  ],
+  "scripts": {
+    "build": "scripts/build.sh",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peterspackman/mdz.git",
+    "directory": "bindings/js"
+  },
+  "keywords": ["molecular-dynamics", "trajectory", "compression", "wasm", "webassembly"],
+  "author": "Peter Spackman",
+  "license": "MIT AND BSD-3-Clause",
+  "homepage": "https://github.com/peterspackman/mdz"
+}
