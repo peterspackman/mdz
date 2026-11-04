@@ -3,9 +3,9 @@ name: Release
 # Pushing a tag vX.Y.Z builds and publishes everything:
 #   1. check the tag matches the version in CMakeLists.txt;
 #   2. run the test suite on Linux, macOS and Windows;
-#   3. build wheels, the sdist and the CLI binaries;
+#   3. build wheels, the sdist, the CLI binaries and the npm package;
 #   4. create the GitHub release (binaries + SHA256SUMS);
-#   5. publish to PyPI.
+#   5. publish to PyPI and npm.
 # Nothing is published unless every earlier step succeeded. Running it by
 # hand (workflow_dispatch) builds and tests everything but publishes nothing.
 
@@ -44,6 +44,10 @@ jobs:
           found = re.search(r"project\(mdz\s+VERSION\s+([0-9.]+)", cmake)
           if not found or found.group(1) != version:
               sys.exit(f"tag {tag} does not match CMakeLists.txt version {found and found.group(1)}")
+          import json
+          npm = json.load(open("bindings/js/package.json"))["version"]
+          if npm != version:
+              sys.exit(f"tag {tag} does not match bindings/js/package.json version {npm}")
           print(f"version {version} OK")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"version={version}\n")
@@ -175,10 +179,31 @@ jobs:
           path: ${{ env.ASSET }}
           if-no-files-found: error
 
+  # --- npm package ---
+  npm-package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: mymindstorm/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+        with:
+          version: 4.0.16
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - working-directory: bindings/js
+        run: npm run build && npm test && npm pack
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-package
+          path: bindings/js/*.tgz
+          if-no-files-found: error
+
   # --- GitHub Release ---
   github-release:
     if: github.ref_type == 'tag'
-    needs: [check-version, test, wheels, sdist, cli]
+    needs: [check-version, test, wheels, sdist, cli, npm-package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -193,7 +218,7 @@ jobs:
           sha256sum -- * | tee SHA256SUMS
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
-          # CLI archives, wheels, the sdist, and SHA256SUMS covering them all.
+          # CLI archives, wheels, the sdist, the npm tarball, and SHA256SUMS.
           files: artifacts/*
           fail_on_unmatched_files: true
           generate_release_notes: true
@@ -224,3 +249,25 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist
+
+  # Uses npm trusted publishing, so no token is stored. The trusted publisher
+  # on npm must be set to this repository, workflow release.yml and
+  # environment `npm`.
+  publish-npm:
+    needs: [github-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@peterspackman/mdz
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: npm
+      - run: npm publish npm/*.tgz --access public

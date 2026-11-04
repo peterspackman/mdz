@@ -301,7 +301,7 @@ publishing from `release.yml`. cebuns gets an `MdzTrajectory` that implements
 its `LazyTrajectory` surface.
 **Success Criteria**: CI is green. cebuns opens a `.mdz` by drag-drop and
 scrubs a 78k-atom trajectory.
-**Status**: Not Started
+**Status**: In Progress. CI and release are done. The cebuns integration is not started.
 
 ## Stage 5 (later): writing and extras
 - Write `.mdz`:

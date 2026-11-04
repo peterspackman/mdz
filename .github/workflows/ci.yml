@@ -108,6 +108,21 @@ jobs:
           name: fuzz-artifacts-${{ matrix.target }}
           path: artifacts
 
+  # The WebAssembly build and the JavaScript package's tests.
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: mymindstorm/setup-emsdk@4528d102f7230f0e7b276855c01ea1159be0e984 # v16
+        with:
+          version: 4.0.16
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - working-directory: bindings/js
+        run: npm run build && npm test
+
   # Build mdz the ways downstream projects consume it: against a system zstd,
   # through add_subdirectory, and through find_package after an install.
   integration:
