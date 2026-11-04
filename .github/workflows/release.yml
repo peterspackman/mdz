@@ -278,5 +278,5 @@ jobs:
           if npm view "@peterspackman/mdz@$VERSION" version >/dev/null 2>&1; then
             echo "@peterspackman/mdz@$VERSION is already published"
           else
-            npm publish npm/*.tgz --access public
+            npm publish ./npm/*.tgz --access public
           fi
