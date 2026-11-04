@@ -254,7 +254,7 @@ jobs:
   # on npm must be set to this repository, workflow release.yml and
   # environment `npm`.
   publish-npm:
-    needs: [github-release]
+    needs: [check-version, github-release]
     runs-on: ubuntu-latest
     environment:
       name: npm
@@ -270,4 +270,13 @@ jobs:
         with:
           name: npm-package
           path: npm
-      - run: npm publish npm/*.tgz --access public
+      # Skip a version that is already on npm, such as one published by hand.
+      - name: Publish
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          if npm view "@peterspackman/mdz@$VERSION" version >/dev/null 2>&1; then
+            echo "@peterspackman/mdz@$VERSION is already published"
+          else
+            npm publish npm/*.tgz --access public
+          fi
