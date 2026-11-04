@@ -97,6 +97,21 @@ test('atoms that come and go', async () => {
   assert.deepEqual(Array.from(await t.readFrame(2)), [2, 2, 2.2].map(Math.fround));
 });
 
+test('atomUniverse of varying atoms has their names, elements and types', async () => {
+  const w = await createWriter({ variableAtoms: true, lossless: true, gofSize: 2 });
+  w.write({ positions: [0, 0, 0, 1, 1, 1], ids: [3, 7], elements: ['O', 'H'], names: ['OW', 'HW'], types: [1, 2] });
+  w.write({ positions: new Float32Array(6), ids: [3, 9], elements: ['O', 'Na'], names: ['OW', 'NA'], types: [1, 3] });
+  w.write({ positions: [2, 2, 2.2], ids: [9], elements: ['Na'], names: ['NA'], types: [3] });
+  const bytes = w.close();
+  for (const src of [bytes, new Blob([bytes])]) {
+    const u = await (await open(src)).atomUniverse();
+    assert.deepEqual(Array.from(u.ids), [3, 7, 9]);
+    assert.deepEqual(u.names, ['OW', 'HW', 'NA']);
+    assert.deepEqual(u.elements, ['O', 'H', 'Na']);
+    assert.deepEqual(Array.from(u.types), [1, 2, 3]);
+  }
+});
+
 test('writer errors', async () => {
   const w = await createWriter();
   w.write({ positions: new Float32Array(6) });
