@@ -3,6 +3,7 @@ add_executable(mdz_tests
   test_kernels.cpp
   test_codec.cpp
   test_container.cpp
+  test_lazy_reader.cpp
   test_golden.cpp
   test_writer.cpp
   test_formats_binary.cpp

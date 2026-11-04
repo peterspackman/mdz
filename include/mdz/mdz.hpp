@@ -8,6 +8,7 @@
 #include "mdz/error.hpp"
 #include "mdz/formats.hpp"
 #include "mdz/frame_batch.hpp"
+#include "mdz/lazy_reader.hpp"
 #include "mdz/metadata.hpp"
 #include "mdz/options.hpp"
 #include "mdz/reader.hpp"

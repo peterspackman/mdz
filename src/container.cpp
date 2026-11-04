@@ -18,11 +18,9 @@ constexpr std::uint16_t kVersion = 4;
 // Header flags. A reader refuses a file with any flag it does not know.
 constexpr std::uint16_t kFlagVariableAtoms = 1;
 constexpr std::uint16_t kKnownFlags = kFlagVariableAtoms;
-constexpr std::size_t kHeaderSize = 24;
 constexpr char kRecordMagic[4] = {'G', 'O', 'F', 1};
 constexpr char kIndexMagic[4] = {'I', 'D', 'X', 1};
 constexpr char kTrailerMagic[8] = {'M', 'D', 'Z', '4', 'E', 'N', 'D', 0};
-constexpr std::size_t kTrailerSize = 16;
 constexpr std::size_t kCompressMetadataFrom = 64;
 constexpr std::uint8_t kZstdMagic[4] = {0x28, 0xB5, 0x2F, 0xFD};
 
@@ -69,7 +67,7 @@ Bytes encode_schema(const Schema& s) {
     return out;
 }
 
-Schema decode_schema(std::size_t natoms, ByteSpan bytes) {
+Schema parse_schema_body(std::size_t natoms, ByteSpan bytes) {
     ByteCursor c(bytes);
     Schema s;
     s.natoms = natoms;
@@ -104,69 +102,19 @@ Schema decode_schema(std::size_t natoms, ByteSpan bytes) {
     return s;
 }
 
-struct ParsedRecord {
-    std::size_t total;  // bytes the record occupies
-    std::size_t nframes;
-    ByteSpan body;
-    std::uint32_t crc;
-    std::vector<ByteSpan> blobs;
-};
-
-// Parse the record at pos, which must end by limit. Does not check the CRC.
-ParsedRecord parse_record(ByteSpan bytes, std::size_t pos, std::size_t limit, std::size_t ncols,
-                          std::size_t expected_first) {
-    ByteCursor c(bytes.first(limit), pos);
-    if (std::memcmp(c.take(4).data(), kRecordMagic, 4) != 0) corrupt("no group record at byte " + std::to_string(pos));
-    const std::size_t body_len = c.u32();
-    ParsedRecord r;
-    r.body = c.take(body_len);
-    r.crc = c.u32();
-    r.total = c.offset() - pos;
-    ByteCursor b(r.body);
-    const std::uint64_t first = b.u64();
-    if (first != expected_first)
-        corrupt("group record at byte " + std::to_string(pos) + " starts at frame " + std::to_string(first) +
-                ", expected " + std::to_string(expected_first));
-    r.nframes = b.u32();
-    if (r.nframes == 0) corrupt("group record at byte " + std::to_string(pos) + " holds no frames");
-    r.blobs.reserve(ncols);
-    for (std::size_t i = 0; i < ncols; ++i) {
-        const std::size_t len = b.u32();
-        r.blobs.push_back(b.take(len));
-    }
-    if (b.remaining() != 0) corrupt("group record at byte " + std::to_string(pos) + " has trailing bytes");
-    return r;
-}
-
 // Read the footer's offset and index, if the file ends in a valid footer and
 // trailer. Returns false for any inconsistency, and the file is then scanned
 // as unclosed.
 bool read_footer(ByteSpan bytes, std::size_t data_start, std::size_t& offset, std::vector<IndexEntry>& entries) {
     if (bytes.size() < kTrailerSize) return false;
     const std::size_t tail = bytes.size() - kTrailerSize;
-    if (tail < data_start || std::memcmp(bytes.data() + tail + 8, kTrailerMagic, 8) != 0) return false;
-    const std::uint64_t off = load_le<std::uint64_t>(bytes.data() + tail);
-    if (off < data_start || off > tail) return false;
-    try {
-        ByteCursor c(bytes.first(tail), static_cast<std::size_t>(off));
-        if (std::memcmp(c.take(4).data(), kIndexMagic, 4) != 0) return false;
-        const std::uint64_t body_len = c.u64();
-        if (body_len > c.remaining()) return false;
-        ByteSpan body = c.take(static_cast<std::size_t>(body_len));
-        if (crc32(body.data(), body.size()) != c.u32() || c.remaining() != 0) return false;
-        ByteCursor b(body);
-        const std::uint64_t n = b.u64();
-        if (n > b.remaining() / 20 || n * 20 != b.remaining()) return false;
-        entries.resize(static_cast<std::size_t>(n));
-        for (auto& e : entries) {
-            e.offset = b.u64();
-            e.first_frame = b.u64();
-            e.nframes = b.u32();
-        }
-    } catch (const Error&) {
-        return false;
-    }
-    offset = static_cast<std::size_t>(off);
+    std::optional<std::uint64_t> off = decode_trailer(bytes.subspan(tail, kTrailerSize));
+    if (!off || *off < data_start || *off > tail) return false;
+    std::optional<std::vector<IndexEntry>> index =
+        decode_footer(bytes.subspan(static_cast<std::size_t>(*off), tail - static_cast<std::size_t>(*off)));
+    if (!index) return false;
+    entries = std::move(*index);
+    offset = static_cast<std::size_t>(*off);
     return true;
 }
 
@@ -200,6 +148,110 @@ void GroupChecks::verify(std::size_t gi) {
         state[gi].store(s, std::memory_order_release);
     }
     if (s == 2) corrupt("group record " + std::to_string(gi) + " fails its checksum");
+}
+
+ParsedRecord parse_record(ByteSpan bytes, std::size_t pos, std::size_t limit, std::size_t ncols,
+                          std::size_t expected_first) {
+    ByteCursor c(bytes.first(limit), pos);
+    if (std::memcmp(c.take(4).data(), kRecordMagic, 4) != 0) corrupt("no group record at byte " + std::to_string(pos));
+    const std::size_t body_len = c.u32();
+    ParsedRecord r;
+    r.body = c.take(body_len);
+    r.crc = c.u32();
+    r.total = c.offset() - pos;
+    ByteCursor b(r.body);
+    const std::uint64_t first = b.u64();
+    if (first != expected_first)
+        corrupt("group record at byte " + std::to_string(pos) + " starts at frame " + std::to_string(first) +
+                ", expected " + std::to_string(expected_first));
+    r.nframes = b.u32();
+    if (r.nframes == 0) corrupt("group record at byte " + std::to_string(pos) + " holds no frames");
+    r.blobs.reserve(ncols);
+    for (std::size_t i = 0; i < ncols; ++i) {
+        const std::size_t len = b.u32();
+        r.blobs.push_back(b.take(len));
+    }
+    if (b.remaining() != 0) corrupt("group record at byte " + std::to_string(pos) + " has trailing bytes");
+    return r;
+}
+
+Header decode_header(ByteSpan bytes) {
+    if (!has_magic(bytes, 0, kMagic, 4)) {
+        if (bytes.size() >= 4 && std::memcmp(bytes.data(), "MDZ", 3) == 0)
+            throw Error(ErrorKind::Corrupt, ".mdz container version " + std::to_string(bytes[3]) +
+                                                " is not supported (this build reads version 4)");
+        corrupt("not an .mdz file");
+    }
+    ByteCursor c(bytes, 4);
+    const std::uint16_t version = c.u16();
+    if (version != kVersion)
+        throw Error(ErrorKind::Corrupt, ".mdz container version " + std::to_string(version) +
+                                            " is not supported (this build reads version 4)");
+    const std::uint16_t flags = c.u16();
+    if (flags & ~kKnownFlags)
+        throw Error(ErrorKind::Corrupt,
+                    "file uses header flags " + std::to_string(flags) + " that this build does not understand");
+    const std::uint64_t natoms64 = c.u64();
+    if (natoms64 > SIZE_MAX / 64) corrupt("atom count too large");
+    Header h;
+    h.natoms = static_cast<std::size_t>(natoms64);
+    h.variable_atoms = flags & kFlagVariableAtoms;
+    h.schema_len = c.u32();
+    h.schema_crc = c.u32();
+    return h;
+}
+
+Schema decode_schema(const Header& h, ByteSpan bytes) {
+    if (crc32(bytes.data(), bytes.size()) != h.schema_crc) corrupt("schema fails its checksum");
+    Schema s = parse_schema_body(h.natoms, bytes);
+    s.variable_atoms = h.variable_atoms;
+    return s;
+}
+
+std::optional<std::uint64_t> decode_trailer(ByteSpan trailer) {
+    if (trailer.size() != kTrailerSize || std::memcmp(trailer.data() + 8, kTrailerMagic, 8) != 0) return std::nullopt;
+    return load_le<std::uint64_t>(trailer.data());
+}
+
+std::optional<std::vector<IndexEntry>> decode_footer(ByteSpan footer) {
+    try {
+        ByteCursor c(footer);
+        if (std::memcmp(c.take(4).data(), kIndexMagic, 4) != 0) return std::nullopt;
+        const std::uint64_t body_len = c.u64();
+        if (body_len > c.remaining()) return std::nullopt;
+        ByteSpan body = c.take(static_cast<std::size_t>(body_len));
+        if (crc32(body.data(), body.size()) != c.u32() || c.remaining() != 0) return std::nullopt;
+        ByteCursor b(body);
+        const std::uint64_t n = b.u64();
+        if (n > b.remaining() / 20 || n * 20 != b.remaining()) return std::nullopt;
+        std::vector<IndexEntry> entries(static_cast<std::size_t>(n));
+        for (auto& e : entries) {
+            e.offset = b.u64();
+            e.first_frame = b.u64();
+            e.nframes = b.u32();
+        }
+        return entries;
+    } catch (const Error&) {
+        return std::nullopt;
+    }
+}
+
+CompressedTrajectory assemble(Schema schema, GofTable gofs, std::vector<std::vector<ByteSpan>> blobs,
+                              std::shared_ptr<const void> keep, std::shared_ptr<GroupChecks> checks) {
+    const std::size_t ncols = schema.columns.size();
+    CompressedTrajectory ct;
+    ct.natoms = schema.natoms;
+    ct.nframes = gofs.nframes();
+    ct.gof_size = schema.gof_size;
+    ct.gofs = std::move(gofs);
+    ct.metadata = std::move(schema.metadata);
+    ct.variable_atoms = schema.variable_atoms;
+    if (ct.variable_atoms) ct.atom_counts = new_atom_counts();
+    ct.columns.reserve(ncols);
+    for (std::size_t k = 0; k < ncols; ++k)
+        ct.columns.emplace_back(std::move(schema.columns[k]), keep, std::move(blobs[k]), checks);
+    validate_layout(ct);
+    return ct;
 }
 
 Schema Schema::of(const CompressedTrajectory& ct) {
@@ -265,28 +317,9 @@ void encode_footer(std::uint64_t offset, const std::vector<IndexEntry>& index, B
 }
 
 Loaded load_container(std::shared_ptr<const void> keep, ByteSpan bytes) {
-    if (!has_magic(bytes, 0, kMagic, 4)) {
-        if (bytes.size() >= 4 && std::memcmp(bytes.data(), "MDZ", 3) == 0)
-            throw Error(ErrorKind::Corrupt, ".mdz container version " + std::to_string(bytes[3]) +
-                                                " is not supported (this build reads version 4)");
-        corrupt("not an .mdz file");
-    }
-    ByteCursor c(bytes, 4);
-    const std::uint16_t version = c.u16();
-    if (version != kVersion)
-        throw Error(ErrorKind::Corrupt, ".mdz container version " + std::to_string(version) +
-                                            " is not supported (this build reads version 4)");
-    const std::uint16_t flags = c.u16();
-    if (flags & ~kKnownFlags)
-        throw Error(ErrorKind::Corrupt,
-                    "file uses header flags " + std::to_string(flags) + " that this build does not understand");
-    const std::uint64_t natoms64 = c.u64();
-    if (natoms64 > SIZE_MAX / 64) corrupt("atom count too large");
-    const std::size_t schema_len = c.u32();
-    const std::uint32_t schema_crc = c.u32();
-    ByteSpan schema_bytes = c.take(schema_len);
-    if (crc32(schema_bytes.data(), schema_bytes.size()) != schema_crc) corrupt("schema fails its checksum");
-    Schema schema = decode_schema(static_cast<std::size_t>(natoms64), schema_bytes);
+    const Header h = decode_header(bytes);
+    ByteCursor c(bytes, kHeaderSize);
+    Schema schema = decode_schema(h, c.take(h.schema_len));
     const std::size_t ncols = schema.columns.size();
     const std::size_t data_start = c.offset();
 
@@ -341,18 +374,7 @@ Loaded load_container(std::shared_ptr<const void> keep, ByteSpan bytes) {
     L.status.data_end = pos;
     L.status.trailing_bytes = complete ? 0 : bytes.size() - pos;
 
-    CompressedTrajectory& ct = L.ct;
-    ct.natoms = schema.natoms;
-    ct.nframes = gofs.nframes();
-    ct.gof_size = schema.gof_size;
-    ct.gofs = std::move(gofs);
-    ct.metadata = std::move(schema.metadata);
-    ct.variable_atoms = flags & kFlagVariableAtoms;
-    if (ct.variable_atoms) ct.atom_counts = new_atom_counts();
-    ct.columns.reserve(ncols);
-    for (std::size_t k = 0; k < ncols; ++k)
-        ct.columns.emplace_back(std::move(schema.columns[k]), keep, std::move(blobs[k]), checks);
-    validate_layout(ct);
+    L.ct = assemble(std::move(schema), std::move(gofs), std::move(blobs), std::move(keep), std::move(checks));
     return L;
 }
 

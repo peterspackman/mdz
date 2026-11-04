@@ -1,6 +1,7 @@
-// Fuzzes whole .mdz files. Each input is parsed, decoded through both the
-// batch and the random-access paths, and then opened for appending.
+// Fuzzes whole .mdz files. Each input is parsed, decoded through the batch,
+// random-access and lazy paths, and then opened for appending.
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -12,6 +13,34 @@
 // many frames compresses to almost nothing. Such inputs are skipped because
 // decoding them is slow and would exceed the fuzzer's time and memory limits.
 constexpr std::size_t kMaxDeclaredValues = 1 << 22;
+
+// Open the file in byte ranges, as LazyReader's callers do, and decode each
+// group.
+void fuzz_lazy(const std::uint8_t* data, std::size_t size) {
+    auto range = [&](std::uint64_t lo, std::uint64_t hi) {
+        hi = std::min<std::uint64_t>(hi, size);
+        lo = std::min(lo, hi);
+        return mdz::ByteSpan(data + lo, static_cast<std::size_t>(hi - lo));
+    };
+    try {
+        auto r = mdz::LazyReader::open(range(0, mdz::LazyReader::head_size(range(0, 24))), size);
+        bool closed = false;
+        if (auto f = r.footer_range(range(size >= 16 ? size - 16 : 0, size)))
+            closed = r.read_footer(f->first, range(f->first, f->second));
+        if (!closed)
+            while (std::uint64_t n = r.record_size(range(r.scan_offset(), r.scan_offset() + 8)))
+                if (!r.add_record(range(r.scan_offset(), r.scan_offset() + n))) break;
+        for (std::size_t gi = 0; gi < r.groups().size(); ++gi) {
+            const auto& g = r.groups()[gi];
+            if (std::max<std::size_t>(r.natoms(), 1) * g.nframes * 9 > kMaxDeclaredValues) continue;
+            try {
+                r.decode_group(gi, range(g.offset, g.offset + g.size));
+            } catch (const mdz::Error&) {
+            }
+        }
+    } catch (const mdz::Error&) {
+    }
+}
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     std::vector<std::uint8_t> bytes(data, data + size);
@@ -31,8 +60,10 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         } catch (const mdz::Error&) {
         }
     } catch (const mdz::Error&) {
+        fuzz_lazy(data, size);
         return 0;
     }
+    fuzz_lazy(data, size);
     try {
         auto r = mdz::Reader::from_bytes(bytes);
         for (std::size_t f = 0; f < r.nframes(); f += 3) {

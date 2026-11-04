@@ -274,7 +274,7 @@ every frame of every fixture identically to `Reader`.
 - A record from the wrong offset raises Corrupt.
 - Variable atom counts and rigid bodies.
 - A fuzz target for `open` and `decode_group`.
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 3: TypeScript API with async range reads
 **Goal**: `open(Blob | ByteSource | bytes)`, a group LRU with a byte budget,

@@ -52,6 +52,7 @@ set(MDZ_SOURCES
   src/file_io.cpp
   src/frame_batch.cpp
   src/kernels.cpp
+  src/lazy_reader.cpp
   src/library.cpp
   src/mapped_file.cpp
   src/metadata.cpp

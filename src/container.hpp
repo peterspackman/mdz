@@ -47,6 +47,51 @@ struct GroupChecks {
     void verify(std::size_t gi);
 };
 
+inline constexpr std::size_t kHeaderSize = 24;
+inline constexpr std::size_t kTrailerSize = 16;
+
+// The fixed-size header at the start of a file.
+struct Header {
+    std::size_t natoms = 0;
+    bool variable_atoms = false;
+    std::size_t schema_len = 0;
+    std::uint32_t schema_crc = 0;
+};
+
+// Parse the first kHeaderSize bytes. Throws Error(Corrupt).
+Header decode_header(ByteSpan bytes);
+// Parse the schema that follows the header, checking its CRC. Throws
+// Error(Corrupt).
+Schema decode_schema(const Header& h, ByteSpan bytes);
+// The footer offset stored in `trailer`, the last kTrailerSize bytes of a
+// file, or nullopt if they are not a trailer.
+std::optional<std::uint64_t> decode_trailer(ByteSpan trailer);
+// Parse a footer, the bytes from its magic up to the trailer. Returns nullopt
+// if it is malformed or fails its CRC.
+std::optional<std::vector<IndexEntry>> decode_footer(ByteSpan footer);
+
+struct ParsedRecord {
+    std::size_t total;  // bytes the record occupies
+    std::size_t nframes;
+    ByteSpan body;
+    std::uint32_t crc;
+    std::vector<ByteSpan> blobs;
+};
+
+// Parse the record at `pos` in `bytes`, which must end by `limit` and start
+// at frame `expected_first`. Does not check the CRC. Throws Error(Corrupt).
+ParsedRecord parse_record(ByteSpan bytes, std::size_t pos, std::size_t limit, std::size_t ncols,
+                          std::size_t expected_first);
+
+// A trajectory over the given groups, whose blobs `keep` keeps alive. Throws
+// Error(Corrupt) if the columns are not a valid layout.
+CompressedTrajectory assemble(Schema schema, GofTable gofs, std::vector<std::vector<ByteSpan>> blobs,
+                              std::shared_ptr<const void> keep, std::shared_ptr<GroupChecks> checks);
+
+// Build the rigid-body model from the metadata's bodies, needed to decode
+// groups coded with it. Throws Error(Corrupt).
+void attach_rigid_model(CompressedTrajectory& ct);
+
 // The header and schema bytes. Throws Error(InvalidInput) if a field does
 // not fit the format.
 Bytes encode_header(const Schema& s);

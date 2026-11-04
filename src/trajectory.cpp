@@ -46,21 +46,26 @@ std::uint64_t write_all(const CompressedTrajectory& ct, Sink&& sink) {
 CompressedTrajectory load_mapped(std::shared_ptr<const detail::MappedFile> f, LoadStatus* status) {
     detail::Loaded L = detail::load_container(f, f->bytes());
     if (status) *status = L.status;
-    // Build the rigid-body model needed to decode groups coded with it.
-    if (L.ct.metadata && !L.ct.metadata->empty() && !L.ct.variable_atoms) {
-        Metadata m = Metadata::decode(*L.ct.metadata);
-        if (m.bodies) {
-            try {
-                L.ct.rigid = detail::RigidModel::build(*m.bodies, L.ct.natoms);
-            } catch (const Error& e) {
-                throw Error(ErrorKind::Corrupt, std::string("corrupt .mdz file: ") + e.what());
-            }
-        }
-    }
+    detail::attach_rigid_model(L.ct);
     return std::move(L.ct);
 }
 
 }  // namespace
+
+namespace detail {
+
+void attach_rigid_model(CompressedTrajectory& ct) {
+    if (!ct.metadata || ct.metadata->empty() || ct.variable_atoms) return;
+    Metadata m = Metadata::decode(*ct.metadata);
+    if (!m.bodies) return;
+    try {
+        ct.rigid = RigidModel::build(*m.bodies, ct.natoms);
+    } catch (const Error& e) {
+        throw Error(ErrorKind::Corrupt, std::string("corrupt .mdz file: ") + e.what());
+    }
+}
+
+}  // namespace detail
 
 std::uint64_t save(const std::string& path, const CompressedTrajectory& ct) {
     detail::OutFile out(path, "wb");
