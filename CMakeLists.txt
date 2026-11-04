@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(mdz VERSION 0.5.0 LANGUAGES C CXX)
+project(mdz VERSION 0.5.1 LANGUAGES C CXX)
 
 # When mdz is built on its own it is the top-level project. When another
 # project includes it with add_subdirectory, only the library is built.

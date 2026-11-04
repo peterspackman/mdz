@@ -1,6 +1,6 @@
 {
   "name": "@peterspackman/mdz",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Read .mdz molecular dynamics trajectories in browsers and Node (WebAssembly)",
   "type": "module",
   "main": "./lib/index.js",
