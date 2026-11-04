@@ -8,14 +8,16 @@ Frames are predicted from the ones before them, so files are 2.5-3.5x
 smaller than XTC when frames are saved every few femtoseconds, and never
 bigger than XTC. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
-mdz is a C++17 library with a command-line tool, Python bindings, a C API and
-a [LAMMPS dump style](lammps/README.md). It reads and writes DCD, XTC, XYZ,
+mdz is a C++17 library with a command-line tool, Python and
+[JavaScript](bindings/js/README.md) bindings, a C API and a
+[LAMMPS dump style](lammps/README.md). It reads and writes DCD, XTC, XYZ,
 extended XYZ, PDB, LAMMPS dumps and `.npy`.
 
 ## Install
 
 ```bash
 pip install mdz
+npm install @peterspackman/mdz
 ```
 
 Prebuilt `mdz` binaries are on the
@@ -58,6 +60,7 @@ varying atom counts, rigid bodies and the C++ API.
 ctest --test-dir build
 MDZ_CLI=$PWD/build/cli/mdz python -m pytest cli/tests
 pip install . && python -m pytest tests
+cd bindings/js && npm run build && npm test   # needs emscripten
 ```
 
 ## License
