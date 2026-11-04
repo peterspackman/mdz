@@ -84,9 +84,11 @@ ParsedRecord parse_record(ByteSpan bytes, std::size_t pos, std::size_t limit, st
                           std::size_t expected_first);
 
 // A trajectory over the given groups, whose blobs `keep` keeps alive. Throws
-// Error(Corrupt) if the columns are not a valid layout.
+// Error(Corrupt) if the columns are not a valid layout. A subset of a file's
+// columns may leave out positions.
 CompressedTrajectory assemble(Schema schema, GofTable gofs, std::vector<std::vector<ByteSpan>> blobs,
-                              std::shared_ptr<const void> keep, std::shared_ptr<GroupChecks> checks);
+                              std::shared_ptr<const void> keep, std::shared_ptr<GroupChecks> checks,
+                              bool require_positions = true);
 
 // Build the rigid-body model from the metadata's bodies, needed to decode
 // groups coded with it. Throws Error(Corrupt).

@@ -1,34 +1,33 @@
 # @peterspackman/mdz
 
-Read `.mdz` molecular dynamics trajectories in browsers and Node, through
-WebAssembly. The API follows the Python package (`mdz.open`), in camelCase.
+Read `.mdz` trajectories in browsers and Node.
 
 ```js
 import { open } from '@peterspackman/mdz';
 
-const t = await open(file, { lengthUnit: 'angstrom' }); // File, Blob, ArrayBuffer or Uint8Array
+const t = await open(file, { lengthUnit: 'angstrom' });
 t.natoms, t.nframes, t.metadata.elements;
-const xyz = await t.readFrame(42);          // Float32Array, natoms * 3
-await t.readFrame(43, xyz);                 // or fill your own buffer
-const cell = await t.cell(42);              // Float32Array(9), rows a, b, c, or null
-const fr = await t.frame(42);               // {positions, cell, scalars: {time, energy, step}, columns}
-const vel = await t.readColumn('velocities', 0, 10); // {dtype, shape, data}
+
+const xyz = await t.readFrame(42);     // Float32Array, natoms * 3
+await t.readFrame(43, xyz);            // fill an existing buffer
+t.peek(44);                            // sync; null unless 44's group is decoded
+await t.prefetch(44, 20, { direction: -1, wrap: true });
+
+await t.cell(42);                      // Float32Array(9), rows a, b, c, or null
+await t.frame(42);                     // { positions, cell, scalars, columns }
+await t.readColumn('energy');          // { dtype, shape, data }
+await t.atomUniverse();                // { ids, elements, names, types }
 t.close();
 ```
 
-Positions and cells are in nm unless `lengthUnit: 'angstrom'` is given. Other
-columns are in their stored units (see `t.columns`). Every returned array
-belongs to the caller. Errors are `MdzError`, whose `kind` is `InvalidInput`,
-`Corrupt`, `OutOfRange`, ...
+`open` takes a `File`/`Blob`, `ArrayBuffer`, `Uint8Array` or any
+`{ size, read(start, end) }`. Only the header and index are read up front;
+groups of frames are read and decoded on demand and cached (`cacheBytes`,
+default 256 MiB).
 
-## Building
-
-Needs emscripten (`emcc`), CMake and Ninja.
+## Build
 
 ```sh
-npm run build   # scripts/build.sh: emcmake build into build-wasm/, copied to dist/
-npm test        # node --test
+npm run build   # needs emcc, cmake, ninja
+npm test
 ```
-
-Test fixtures are regenerated with `test/fixtures/make_fixtures.sh`, which uses
-the native `mdz` CLI.

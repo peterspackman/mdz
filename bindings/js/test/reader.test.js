@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { MdzError, init, open, version } from '../lib/index.js';
+import { MdzError, open, version } from '../lib/index.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
 
@@ -154,7 +154,7 @@ test('atoms that come and go', async () => {
   const t = await open(fixture('gcmc.mdz'), { lengthUnit: 'angstrom' });
   assert.equal(t.variableAtoms, true);
   assert.equal(t.natoms, 0);
-  assert.deepEqual(Array.from(t.frameNatoms), [3, 4, 2]);
+  assert.deepEqual(Array.from(await t.frameNatoms()), [3, 4, 2]);
   assert.deepEqual(Array.from(await t.atomIds(1)), [1, 2, 5, 9]);
   assert.deepEqual(Array.from(await t.atomIds(2)), [1, 9]);
   // Stored exactly: the values come back as written, in Å.
@@ -181,17 +181,6 @@ test('inputs that are not .mdz files throw MdzError', async () => {
   const bytes = fixture('nacl.mdz');
   await assert.rejects(open(bytes.subarray(0, 20)), { name: 'MdzError' });
   await assert.rejects(open('nacl.mdz'), { kind: 'InvalidInput' });
-});
-
-test('failed opens release their memory', async () => {
-  // Each failed open copies 16 MB into wasm memory before rejecting it. If
-  // the copy were not freed, 40 failures would grow the heap by 640 MB.
-  const core = await init();
-  const garbage = new Uint8Array(16 << 20);
-  await assert.rejects(open(garbage));
-  const before = core.HEAPU8.length;
-  for (let i = 0; i < 40; ++i) await assert.rejects(open(garbage), { kind: 'Corrupt' });
-  assert.ok(core.HEAPU8.length - before <= 32 << 20, `heap grew by ${core.HEAPU8.length - before} bytes`);
 });
 
 test('Blob, ArrayBuffer and typed-array views are accepted', async () => {

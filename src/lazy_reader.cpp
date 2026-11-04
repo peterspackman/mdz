@@ -161,7 +161,7 @@ FrameBatch LazyReader::decode_group(std::size_t gi, ByteSpan record, const std::
     std::vector<std::vector<ByteSpan>> blobs;
     for (std::size_t k = 0; k < m.schema.columns.size(); ++k) {
         const std::string& name = m.schema.columns[k].name;
-        const bool keep = columns.empty() || name == "positions" || name == kMembershipColumn ||
+        const bool keep = columns.empty() || name == kMembershipColumn ||
                           std::find(columns.begin(), columns.end(), name) != columns.end();
         if (!keep) continue;
         s.columns.push_back(m.schema.columns[k]);
@@ -169,7 +169,8 @@ FrameBatch LazyReader::decode_group(std::size_t gi, ByteSpan record, const std::
     }
     GofTable one;
     one.push(g.nframes);
-    CompressedTrajectory ct = detail::assemble(std::move(s), std::move(one), std::move(blobs), nullptr, nullptr);
+    CompressedTrajectory ct =
+        detail::assemble(std::move(s), std::move(one), std::move(blobs), nullptr, nullptr, columns.empty());
     ct.rigid = m.proto.rigid;
     return decompress(ct);
 }

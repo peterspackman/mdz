@@ -293,7 +293,7 @@ tail, the footer and the records it needs, which tests check by counting
 - The Å scaling.
 - A browser smoke test, a page in `examples/` driven by vitest browser
   mode or Playwright.
-**Status**: Not Started
+**Status**: Complete
 
 ## Stage 4: CI, release, cebuns integration
 **Goal**: a CI job that runs a pinned emsdk build and the Node tests, and npm

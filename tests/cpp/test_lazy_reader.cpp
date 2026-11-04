@@ -193,12 +193,15 @@ TEST(lazy_decodes_only_the_columns_asked_for) {
     Source src{file};
     mdz::LazyReader r = open_lazy(src);
     mdz::FrameBatch all = decode(r, src, 0);
-    mdz::FrameBatch some = decode(r, src, 0, {"box", "time"});
+    mdz::FrameBatch some = decode(r, src, 0, {"positions", "box", "time"});
     CHECK(some.columns.count("velocities") == 0);
     CHECK(some.int_frame_props.count("step") == 0);
     CHECK(some.columns.at("positions") == all.columns.at("positions"));
     CHECK(some.box == all.box);
     CHECK(some.frame_props.at("time") == all.frame_props.at("time"));
+    mdz::FrameBatch scalars = decode(r, src, 0, {"step"});
+    CHECK(scalars.columns.empty());
+    CHECK(scalars.int_frame_props.at("step") == all.int_frame_props.at("step"));
 }
 
 TEST(lazy_variable_atom_counts) {

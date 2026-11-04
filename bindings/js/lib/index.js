@@ -1,18 +1,10 @@
-// mdz for JavaScript: read .mdz trajectories in browsers and Node.
+// Read .mdz trajectories in browsers and Node.
 //
-//   import { open } from '@peterspackman/mdz';
-//   const t = await open(file, { lengthUnit: 'angstrom' });
-//   const xyz = await t.readFrame(42);   // Float32Array, natoms * 3
-//   const box = await t.cell(42);        // Float32Array(9), rows a, b, c, or null
-//
-// The API follows the Python package (mdz.open / MdzReader), in camelCase.
-// Methods that decode are async, so that later versions can read large
-// files in byte ranges without changing the API.
+// open() reads the header and the group index; each group of frames is read
+// and decoded when a frame in it is first asked for, and kept in an LRU cache.
 
 import createMdzCore from '../dist/mdz_core.mjs';
 
-/** Error raised by mdz. `kind` is InvalidInput, Corrupt, Io, OutOfRange,
- * OutOfMemory or Internal. */
 export class MdzError extends Error {
   constructor(message, kind = 'Internal') {
     super(message);
@@ -23,9 +15,6 @@ export class MdzError extends Error {
 
 let corePromise = null;
 
-/** Load the WebAssembly module. Called by open(); call it yourself to load
- * early or to pass emscripten options such as `locateFile` or `wasmBinary`.
- * Options only take effect on the first call. */
 export function init(options = {}) {
   if (!corePromise) {
     corePromise = createMdzCore({ ...options, MdzError }).catch((e) => {
@@ -36,60 +25,144 @@ export function init(options = {}) {
   return corePromise;
 }
 
-/** The version of the mdz library. */
 export async function version() {
   return (await init()).version();
 }
 
 const LENGTH_SCALE = { nm: 1, angstrom: 10 };
+const HEAD_GUESS = 64 * 1024;
+const DEFAULT_CACHE_BYTES = 256 * 1024 * 1024;
 
-async function toBytes(input) {
-  if (input instanceof Uint8Array) return input;
-  if (input instanceof ArrayBuffer) return new Uint8Array(input);
-  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-  if (typeof Blob !== 'undefined' && input instanceof Blob) return new Uint8Array(await input.arrayBuffer());
-  throw new MdzError('open() takes a Uint8Array, ArrayBuffer or Blob', 'InvalidInput');
+export function blobSource(blob) {
+  return {
+    size: blob.size,
+    read: async (start, end) => new Uint8Array(await blob.slice(start, end).arrayBuffer()),
+  };
 }
 
-/**
- * Open a .mdz file held in memory or in a Blob (such as a File from a file
- * picker).
- * @param {Uint8Array | ArrayBuffer | ArrayBufferView | Blob} input
- * @param {{ lengthUnit?: 'nm' | 'angstrom' }} [options]
- */
+function memorySource(bytes) {
+  return { size: bytes.length, read: (start, end) => bytes.subarray(start, end) };
+}
+
+function toSource(input) {
+  if (input instanceof Uint8Array) return memorySource(input);
+  if (input instanceof ArrayBuffer) return memorySource(new Uint8Array(input));
+  if (ArrayBuffer.isView(input)) return memorySource(new Uint8Array(input.buffer, input.byteOffset, input.byteLength));
+  if (typeof Blob !== 'undefined' && input instanceof Blob) return blobSource(input);
+  if (input && typeof input.size === 'number' && typeof input.read === 'function') return input;
+  throw new MdzError('open() takes a Uint8Array, ArrayBuffer, Blob or byte source', 'InvalidInput');
+}
+
+async function readRange(src, start, end) {
+  const bytes = await src.read(start, end);
+  if (!(bytes instanceof Uint8Array) || bytes.length !== end - start)
+    throw new MdzError(`byte source returned ${bytes?.length} bytes for [${start}, ${end})`, 'Io');
+  return bytes;
+}
+
+async function scanRecords(core, lazy, src) {
+  for (;;) {
+    const at = lazy.scanOffset();
+    if (at + core.recordHeadSize > src.size) return;
+    const n = lazy.recordSize(await readRange(src, at, at + core.recordHeadSize));
+    if (!n || !lazy.addRecord(await readRange(src, at, at + n))) return;
+  }
+}
+
 export async function open(input, options = {}) {
   const lengthUnit = options.lengthUnit ?? 'nm';
   const scale = LENGTH_SCALE[lengthUnit];
   if (scale === undefined) throw new MdzError(`unknown lengthUnit '${lengthUnit}' (use 'nm' or 'angstrom')`, 'InvalidInput');
-  const [core, bytes] = await Promise.all([init(), toBytes(input)]);
-  return new Trajectory(core.Reader.fromBytes(bytes), lengthUnit, scale);
+  const src = toSource(input);
+  const core = await init();
+  const size = src.size;
+  if (size < core.headerSize) throw new MdzError('not an .mdz file: too short', 'Corrupt');
+  let head = await readRange(src, 0, Math.min(size, HEAD_GUESS));
+  const need = core.LazyReader.headSize(head);
+  if (need > head.length && need <= size) head = await readRange(src, 0, need);
+  const lazy = core.LazyReader.open(head, size);
+  try {
+    let closed = false;
+    if (size >= core.trailerSize) {
+      const range = lazy.footerRange(await readRange(src, size - core.trailerSize, size));
+      if (range) closed = lazy.readFooter(range[0], await readRange(src, range[0], range[1]));
+    }
+    if (!closed) await scanRecords(core, lazy, src);
+  } catch (e) {
+    lazy.delete();
+    throw e;
+  }
+  return new Trajectory(lazy, src, lengthUnit, scale, options.cacheBytes ?? DEFAULT_CACHE_BYTES);
 }
 
 function scaleInPlace(a, s) {
-  if (s !== 1) for (let i = 0; i < a.length; ++i) a[i] *= s;
+  if (a && s !== 1) for (let i = 0; i < a.length; ++i) a[i] *= s;
   return a;
 }
 
+function iota(n) {
+  const a = new Int32Array(n);
+  for (let i = 0; i < n; ++i) a[i] = i;
+  return a;
+}
+
+function concat(chunks, Type) {
+  const out = new Type(chunks.reduce((n, c) => n + c.length, 0));
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
+}
+
+// (a, gamma, b, beta, alpha, c) of a row-major box, angles in degrees.
+function cellParams(m) {
+  const len = (i) => Math.hypot(m[i], m[i + 1], m[i + 2]);
+  const angle = (i, j) => {
+    const d = (m[i] * m[j] + m[i + 1] * m[j + 1] + m[i + 2] * m[j + 2]) / (len(i) * len(j));
+    return (Math.acos(Math.max(-1, Math.min(1, d))) * 180) / Math.PI;
+  };
+  return [len(0), angle(0, 3), len(3), angle(0, 6), angle(3, 6), len(6)];
+}
+
+function groupBytes(g) {
+  let n = 0;
+  const add = (a) => {
+    if (a) n += a.byteLength ?? a.length * 16;
+  };
+  [g.natoms, g.offsets, g.positions, g.cells, g.origins, g.ids, g.types, g.elements, g.names].forEach(add);
+  Object.values(g.scalars).forEach(add);
+  Object.values(g.columns).forEach(add);
+  return n;
+}
+
 export class Trajectory {
-  #r;
+  #lazy;
+  #src;
   #scale;
+  #budget;
+  #groups;
+  #cache = new Map();
+  #cached = 0;
+  #pending = new Map();
   #columns;
   #metadata;
-  #frameNatoms;
 
-  /** @internal Use open(). */
-  constructor(reader, lengthUnit, scale) {
-    this.#r = reader;
+  constructor(lazy, src, lengthUnit, scale, cacheBytes) {
+    this.#lazy = lazy;
+    this.#src = src;
     this.#scale = scale;
+    this.#budget = cacheBytes;
+    this.#groups = lazy.groups();
     this.lengthUnit = lengthUnit;
   }
 
   #reader() {
-    if (!this.#r) throw new MdzError('the trajectory is closed', 'InvalidInput');
-    return this.#r;
+    if (!this.#lazy) throw new MdzError('the trajectory is closed', 'InvalidInput');
+    return this.#lazy;
   }
 
-  // Resolve a frame index, counting from the end if negative.
   #index(i) {
     const n = this.nframes;
     if (!Number.isInteger(i)) throw new MdzError(`frame index must be an integer, got ${i}`, 'InvalidInput');
@@ -98,101 +171,294 @@ export class Trajectory {
     return f;
   }
 
-  /** Atoms per frame, or 0 if the count varies (see variableAtoms). */
-  get natoms() { return this.#reader().natoms; }
-  get nframes() { return this.#reader().nframes; }
-  /** Whether the atom count varies between frames. */
-  get variableAtoms() { return this.#reader().variableAtoms; }
-  /** Whether the writer closed the file. An unclosed file holds its complete groups. */
-  get complete() { return this.#reader().complete; }
-  /** Quantization step of positions in lengthUnit, or 0 if they are exact. */
-  get precision() { return this.#reader().precision * this.#scale; }
-  get gofSize() { return this.#reader().gofSize; }
-  get nGroups() { return this.#reader().nGroups; }
-
-  /** Names of every readable column, with 'positions' first. 'cell' is derived from 'box'. */
-  get columnNames() { return this.#reader().columnNames(); }
-  /** Column descriptors: name, dtype, width, perFrame, lossy, precision, unit. */
-  get columns() { return (this.#columns ??= this.#reader().columns()); }
-  /** Static metadata: atomNames, elements, atomTypes, atomIds, residues, bodies, attributes, ... */
-  get metadata() { return (this.#metadata ??= this.#reader().metadata()); }
-  /** Atoms in each frame, as a Float64Array of length nframes. */
-  get frameNatoms() { return (this.#frameNatoms ??= this.#reader().frameNatoms()); }
-
-  /** Atom ids of one frame, in the order its positions are returned. */
-  async atomIds(i) { return this.#reader().atomIds(this.#index(i)); }
-
-  /**
-   * Positions of one frame, natoms * 3 values in lengthUnit. Fills and returns
-   * `out` if given, which must hold exactly that many values.
-   */
-  async readFrame(i, out) {
-    const f = this.#index(i);
-    return this.#deliver(this.#reader().readPositions(f, 1), out);
-  }
-
-  /**
-   * Positions of frames [start, stop), packed frame after frame. The range is
-   * clipped to the file. Fills and returns `out` if given.
-   */
-  async readFrames(start = 0, stop = this.nframes, out) {
+  #clip(start, stop) {
     const n = this.nframes;
     const lo = Math.max(0, Math.min(start, n));
-    const hi = Math.max(lo, Math.min(stop, n));
-    if (hi === lo) return this.#deliver(new Float32Array(0), out);
-    return this.#deliver(this.#reader().readPositions(lo, hi - lo), out);
+    return [lo, Math.max(lo, Math.min(stop, n))];
   }
 
-  #deliver(positions, out) {
-    scaleInPlace(positions, this.#scale);
-    if (out === undefined) return positions;
-    if (!(out instanceof Float32Array) || out.length !== positions.length)
-      throw new MdzError(`out must be a Float32Array of length ${positions.length}`, 'InvalidInput');
-    out.set(positions);
-    return out;
+  #first(gi) {
+    return this.#groups[4 * gi + 2];
   }
 
-  /** The cell of one frame as a Float32Array(9), rows a, b, c, in lengthUnit; null if the file has none. */
-  async cell(i) {
-    const c = this.#reader().cell(this.#index(i));
-    return c && scaleInPlace(c, this.#scale);
+  #groupOf(f) {
+    let lo = 0;
+    let hi = this.nGroups - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (this.#first(mid) <= f) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
   }
 
-  /**
-   * One frame with every column:
-   * { natoms, positions, cell, scalars: {time, energy, step, ...}, columns: {velocities, ...} }.
-   * positions and cell are in lengthUnit; other columns in their stored units
-   * (see `columns`). Files whose atom count varies also give ids, elements,
-   * names and types for the frame.
-   */
-  async frame(i) {
-    const fr = this.#reader().frame(this.#index(i));
-    scaleInPlace(fr.positions, this.#scale);
-    if (fr.cell) scaleInPlace(fr.cell, this.#scale);
+  async #decode(gi, columns) {
+    const offset = this.#groups[4 * gi];
+    const bytes = await readRange(this.#src, offset, offset + this.#groups[4 * gi + 1]);
+    const g = this.#reader().decodeGroup(gi, bytes, columns);
+    scaleInPlace(g.positions, this.#scale);
+    scaleInPlace(g.cells, this.#scale);
+    scaleInPlace(g.origins, this.#scale);
+    g.first = this.#first(gi);
+    g.offsets = new Float64Array(g.nframes + 1);
+    for (let k = 0; k < g.nframes; ++k) g.offsets[k + 1] = g.offsets[k] + g.natoms[k];
+    return g;
+  }
+
+  // A decoded group with every column, from the cache or the source.
+  #load(gi) {
+    const hit = this.#peekGroup(gi);
+    if (hit) return Promise.resolve(hit);
+    let p = this.#pending.get(gi);
+    if (!p) {
+      p = this.#decode(gi, [])
+        .then((g) => {
+          if (this.#lazy) this.#insert(gi, g);
+          return g;
+        })
+        .finally(() => this.#pending.delete(gi));
+      this.#pending.set(gi, p);
+    }
+    return p;
+  }
+
+  // Only some columns, from the cache if the group is there, without caching.
+  #loadColumns(gi, columns) {
+    const hit = this.#peekGroup(gi);
+    return hit ? Promise.resolve(hit) : this.#decode(gi, columns);
+  }
+
+  #peekGroup(gi) {
+    const g = this.#cache.get(gi);
+    if (g) {
+      this.#cache.delete(gi);
+      this.#cache.set(gi, g);
+    }
+    return g;
+  }
+
+  #insert(gi, g) {
+    g.bytes = groupBytes(g);
+    this.#cache.set(gi, g);
+    this.#cached += g.bytes;
+    for (const [k, old] of this.#cache) {
+      if (this.#cached <= this.#budget || this.#cache.size <= 1) break;
+      this.#cache.delete(k);
+      this.#cached -= old.bytes;
+    }
+  }
+
+  #frameOf(g, f) {
+    const k = f - g.first;
+    const a0 = g.offsets[k];
+    const a1 = g.offsets[k + 1];
+    const atoms = (arr) => {
+      const w = arr.length / g.offsets[g.nframes];
+      return arr.slice(a0 * w, a1 * w);
+    };
+    const fr = {
+      natoms: a1 - a0,
+      positions: g.positions.slice(a0 * 3, a1 * 3),
+      cell: g.cells ? g.cells.slice(9 * k, 9 * k + 9) : null,
+      scalars: {},
+      columns: {},
+    };
+    if (g.origins) fr.origin = g.origins.slice(3 * k, 3 * k + 3);
+    for (const [name, v] of Object.entries(g.scalars)) fr.scalars[name] = v[k];
+    for (const [name, v] of Object.entries(g.columns)) fr.columns[name] = atoms(v);
+    for (const name of ['ids', 'types', 'elements', 'names']) if (g[name]) fr[name] = atoms(g[name]);
     return fr;
   }
 
-  /**
-   * Decode a column for frames [start, stop) as { name, dtype, shape, data }.
-   * Shapes follow the Python package. 'positions' is in lengthUnit; other
-   * columns are in their stored units. int64 columns (step) come back as
-   * Float64Array.
-   */
-  async readColumn(name, start = 0, stop = this.nframes) {
+  #positionsOf(g, f, out) {
+    const k = f - g.first;
+    const p = g.positions.subarray(g.offsets[k] * 3, g.offsets[k + 1] * 3);
+    if (out === undefined) return p.slice();
+    if (!(out instanceof Float32Array) || out.length !== p.length)
+      throw new MdzError(`out must be a Float32Array of length ${p.length}`, 'InvalidInput');
+    out.set(p);
+    return out;
+  }
+
+  get natoms() { return this.#reader().natoms; }
+  get nframes() { return this.#reader().nframes; }
+  get variableAtoms() { return this.#reader().variableAtoms; }
+  get complete() { return this.#reader().complete; }
+  get precision() { return this.#reader().precision * this.#scale; }
+  get gofSize() { return this.#reader().gofSize; }
+  get nGroups() { return this.#groups.length / 4; }
+  get columns() { return (this.#columns ??= this.#reader().columns()); }
+  get metadata() { return (this.#metadata ??= this.#reader().metadata()); }
+  get cachedBytes() { return this.#cached; }
+
+  get columnNames() {
+    const names = this.columns.map((c) => c.name);
+    if (names.includes('box')) names.push('cell');
+    return names;
+  }
+
+  async readFrame(i, out) {
+    const f = this.#index(i);
+    return this.#positionsOf(await this.#load(this.#groupOf(f)), f, out);
+  }
+
+  // Positions of frame i if its group is decoded, else null. Never waits.
+  peek(i, out) {
+    const f = this.#index(i);
+    const g = this.#peekGroup(this.#groupOf(f));
+    return g ? this.#positionsOf(g, f, out) : null;
+  }
+
+  async frame(i) {
+    const f = this.#index(i);
+    return this.#frameOf(await this.#load(this.#groupOf(f)), f);
+  }
+
+  peekFrame(i) {
+    const f = this.#index(i);
+    const g = this.#peekGroup(this.#groupOf(f));
+    return g ? this.#frameOf(g, f) : null;
+  }
+
+  async cell(i) {
+    const f = this.#index(i);
+    const g = await this.#load(this.#groupOf(f));
+    const k = f - g.first;
+    return g.cells ? g.cells.slice(9 * k, 9 * k + 9) : null;
+  }
+
+  async atomIds(i) {
+    const f = this.#index(i);
+    if (!this.variableAtoms) return this.metadata.atomIds?.slice() ?? iota(this.natoms);
+    return this.#frameOf(await this.#load(this.#groupOf(f)), f).ids;
+  }
+
+  async readFrames(start = 0, stop = this.nframes, out) {
+    const [lo, hi] = this.#clip(start, stop);
+    const chunks = [];
+    for (let f = lo; f < hi; ) {
+      const g = await this.#load(this.#groupOf(f));
+      const end = Math.min(hi, g.first + g.nframes);
+      chunks.push(g.positions.slice(g.offsets[f - g.first] * 3, g.offsets[end - g.first] * 3));
+      f = end;
+    }
+    const all = concat(chunks, Float32Array);
+    if (out === undefined) return all;
+    if (!(out instanceof Float32Array) || out.length !== all.length)
+      throw new MdzError(`out must be a Float32Array of length ${all.length}`, 'InvalidInput');
+    out.set(all);
+    return out;
+  }
+
+  // Decode the groups that hold count frames from frame i, stepping by
+  // direction and wrapping around the ends if wrap is set.
+  async prefetch(i, count = this.gofSize, { direction = 1, wrap = false } = {}) {
     const n = this.nframes;
-    const lo = Math.max(0, Math.min(start, n));
-    const hi = Math.max(lo, Math.min(stop, n));
-    if (hi === lo && n > 0) throw new MdzError(`empty frame range [${start}, ${stop})`, 'OutOfRange');
-    const col = this.#reader().readColumn(name, lo, hi - lo);
-    if (name === 'positions') scaleInPlace(col.data, this.#scale);
-    return col;
+    const groups = new Set();
+    let f = this.#index(i);
+    for (let k = 0; k < count; ++k) {
+      groups.add(this.#groupOf(f));
+      f += direction;
+      if (f < 0 || f >= n) {
+        if (!wrap) break;
+        f = (f + n) % n;
+      }
+    }
+    await Promise.all([...groups].map((gi) => this.#load(gi)));
   }
 
-  /** Release the WebAssembly memory held by this trajectory. Closing again does nothing. */
+  async readColumn(name, start = 0, stop = this.nframes) {
+    const [lo, hi] = this.#clip(start, stop);
+    const n = hi - lo;
+    const natoms = this.natoms;
+    const varying = this.variableAtoms;
+    if (name === 'positions') {
+      const data = await this.readFrames(lo, hi);
+      return { name, dtype: 'f32', shape: varying ? [data.length / 3, 3] : [n, natoms, 3], data };
+    }
+    const stored = name === 'cell' ? 'box' : name;
+    const desc = this.columns.find((c) => c.name === stored);
+    if (!desc) throw new MdzError(`no column named '${name}'`, 'InvalidInput');
+    const chunks = [];
+    for (let f = lo; f < hi; ) {
+      const gi = this.#groupOf(f);
+      const g = await this.#loadColumns(gi, [stored]);
+      const k0 = f - g.first;
+      const k1 = Math.min(hi, g.first + g.nframes) - g.first;
+      if (stored === 'box') chunks.push(g.cells.slice(9 * k0, 9 * k1));
+      else if (stored === 'origin') chunks.push(g.origins.slice(3 * k0, 3 * k1));
+      else if (desc.perFrame) chunks.push(g.scalars[stored].slice(k0, k1));
+      else {
+        const w = desc.width;
+        chunks.push(g.columns[stored].slice(g.offsets[k0] * w, g.offsets[k1] * w));
+      }
+      f = g.first + k1;
+    }
+    if (name === 'cell') {
+      const boxes = concat(chunks, Float32Array);
+      const data = new Float64Array(6 * n);
+      for (let k = 0; k < n; ++k) data.set(cellParams(boxes.subarray(9 * k, 9 * k + 9)), 6 * k);
+      return { name, dtype: 'f64', shape: [n, 6], data };
+    }
+    if (stored === 'box') return { name, dtype: 'f32', shape: [n, 3, 3], data: concat(chunks, Float32Array) };
+    if (stored === 'origin') return { name, dtype: 'f32', shape: [n, 3], data: concat(chunks, Float32Array) };
+    if (desc.perFrame) {
+      const data = concat(chunks, Float64Array);
+      return { name, dtype: desc.dtype === 'i64' ? 'i64' : 'f64', shape: [n], data };
+    }
+    const Type = chunks[0] instanceof Int32Array ? Int32Array : Float32Array;
+    const data = concat(chunks, Type);
+    const w = desc.width;
+    const rows = data.length / w;
+    const shape = varying ? (w === 1 ? [rows] : [rows, w]) : w === 1 ? [n, natoms] : [n, natoms, w];
+    return { name, dtype: Type === Int32Array ? 'i32' : 'f32', shape, data };
+  }
+
+  // Atoms in each frame.
+  async frameNatoms() {
+    if (!this.variableAtoms) return new Float64Array(this.nframes).fill(this.natoms);
+    const chunks = [];
+    for (let gi = 0; gi < this.nGroups; ++gi) chunks.push((await this.#loadColumns(gi, ['mdz.atoms'])).natoms);
+    return concat(chunks, Float64Array);
+  }
+
+  // Every atom in the file, sorted by id, with its element, name and type
+  // where stored. In a file whose atom count varies, an atom takes the
+  // values of the first group it appears in.
+  async atomUniverse() {
+    if (!this.variableAtoms) {
+      const m = this.metadata;
+      const out = { ids: m.atomIds?.slice() ?? iota(this.natoms) };
+      if (m.elements) out.elements = m.elements.slice();
+      if (m.atomNames) out.names = m.atomNames.slice();
+      if (m.atomTypes) out.types = m.atomTypes.slice();
+      return out;
+    }
+    const seen = new Map();
+    for (let gi = 0; gi < this.nGroups; ++gi) {
+      const g = await this.#loadColumns(gi, ['mdz.atoms', 'mdz.element', 'mdz.name', 'mdz.type']);
+      for (let a = 0; a < g.ids.length; ++a) {
+        const id = g.ids[a];
+        if (!seen.has(id)) seen.set(id, { element: g.elements?.[a], name: g.names?.[a], type: g.types?.[a] });
+      }
+    }
+    const ids = Int32Array.from(seen.keys()).sort();
+    const out = { ids };
+    const first = seen.get(ids[0]) ?? {};
+    if (first.element !== undefined) out.elements = Array.from(ids, (id) => seen.get(id).element);
+    if (first.name !== undefined) out.names = Array.from(ids, (id) => seen.get(id).name);
+    if (first.type !== undefined) out.types = Int32Array.from(ids, (id) => seen.get(id).type);
+    return out;
+  }
+
   close() {
-    this.#r?.delete();
-    this.#r = null;
+    this.#lazy?.delete();
+    this.#lazy = null;
+    this.#cache.clear();
+    this.#cached = 0;
   }
 
-  [Symbol.dispose]() { this.close(); }
+  [Symbol.dispose]() {
+    this.close();
+  }
 }

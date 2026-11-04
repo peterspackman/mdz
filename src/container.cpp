@@ -118,10 +118,10 @@ bool read_footer(ByteSpan bytes, std::size_t data_start, std::size_t& offset, st
     return true;
 }
 
-void validate_layout(const CompressedTrajectory& ct) {
+void validate_layout(const CompressedTrajectory& ct, bool require_positions) {
     const CompressedColumn* pos = ct.column("positions");
-    if (!pos) corrupt("no positions column");
-    if (pos->desc.dtype != Dtype::F32 || pos->desc.width != 3 || pos->desc.per_frame)
+    if (!pos && require_positions) corrupt("no positions column");
+    if (pos && (pos->desc.dtype != Dtype::F32 || pos->desc.width != 3 || pos->desc.per_frame))
         corrupt("positions column has the wrong shape");
     for (const auto& col : ct.columns) {
         const ColumnDesc& d = col.desc;
@@ -237,7 +237,8 @@ std::optional<std::vector<IndexEntry>> decode_footer(ByteSpan footer) {
 }
 
 CompressedTrajectory assemble(Schema schema, GofTable gofs, std::vector<std::vector<ByteSpan>> blobs,
-                              std::shared_ptr<const void> keep, std::shared_ptr<GroupChecks> checks) {
+                              std::shared_ptr<const void> keep, std::shared_ptr<GroupChecks> checks,
+                              bool require_positions) {
     const std::size_t ncols = schema.columns.size();
     CompressedTrajectory ct;
     ct.natoms = schema.natoms;
@@ -250,7 +251,7 @@ CompressedTrajectory assemble(Schema schema, GofTable gofs, std::vector<std::vec
     ct.columns.reserve(ncols);
     for (std::size_t k = 0; k < ncols; ++k)
         ct.columns.emplace_back(std::move(schema.columns[k]), keep, std::move(blobs[k]), checks);
-    validate_layout(ct);
+    validate_layout(ct, require_positions);
     return ct;
 }
 

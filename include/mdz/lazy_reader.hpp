@@ -89,8 +89,8 @@ public:
     std::size_t group_of(std::size_t frame) const;
 
     // Decode group `gi` from its record bytes. Values are in stored units.
-    // `columns` limits decoding to the columns named, plus positions; empty
-    // means every column. Throws Error(Corrupt) for a damaged record and
+    // `columns` limits decoding to the columns named; empty means every
+    // column. Throws Error(Corrupt) for a damaged record and
     // Error(OutOfRange) for a bad index.
     FrameBatch decode_group(std::size_t gi, ByteSpan record, const std::vector<std::string>& columns = {}) const;
 
