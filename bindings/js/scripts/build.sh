@@ -7,7 +7,13 @@ here="$(cd "$(dirname "$0")/.." && pwd)"
 root="$(cd "$here/../.." && pwd)"
 build="$here/build-wasm"
 
-emcmake cmake -S "$root" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE="${1:-Release}"
+type="${1:-Release}"
+case "$type" in
+  Release | Debug | RelWithDebInfo | MinSizeRel) ;;
+  *) echo "unknown build type '$type' (Release, Debug, RelWithDebInfo or MinSizeRel)" >&2; exit 2 ;;
+esac
+
+emcmake cmake -S "$root" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE="$type"
 cmake --build "$build" --target mdz_core mdz_full
 rm -rf "$here/dist"
 mkdir -p "$here/dist"

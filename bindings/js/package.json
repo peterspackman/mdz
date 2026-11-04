@@ -23,6 +23,7 @@
   ],
   "scripts": {
     "build": "scripts/build.sh",
+    "prepack": "scripts/build.sh Release",
     "test": "node --test"
   },
   "engines": {
