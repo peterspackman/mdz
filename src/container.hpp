@@ -111,10 +111,16 @@ struct Loaded {
 };
 
 // Parse a whole file held in `bytes`, which `keep` keeps alive for the
-// returned columns. The records of a closed file must all be well formed. An
-// unclosed file yields every group before the first damaged record. Throws
-// Error(Corrupt).
+// returned columns. Version 3 files are read too, so they can be converted. The records of a closed file must all be
+// well formed. An unclosed file yields every group before the first damaged record. Throws Error(Corrupt).
 Loaded load_container(std::shared_ptr<const void> keep, ByteSpan bytes);
+
+// Split a per-frame column's blob covering every frame, as version 3 files
+// store it, into one blob per group. Throws Error(Corrupt).
+std::vector<Bytes> split_frame_blob(const ColumnDesc& d, ByteSpan blob, const GofTable& gofs, int level);
+// Convert a version 3 `cell` blob, cell parameters per frame in nm and
+// degrees, to one `box` blob per group.
+std::vector<Bytes> v3_cell_to_box(ByteSpan blob, const GofTable& gofs, int level);
 
 // Throws Error(InvalidInput) if frames for `chunk` cannot be appended to a
 // file with schema `file`.

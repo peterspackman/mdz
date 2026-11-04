@@ -466,6 +466,16 @@ int cmd_extract(const Args& a) {
 int cmd_convert(const Args& a) {
     const std::string input = a.positional()[0];
     const auto t0 = std::chrono::steady_clock::now();
+    // .mdz to .mdz copies the compressed groups as they are, which also
+    // rewrites an older file in the current version.
+    if (!a.has("format") && ext_lower(input) == "mdz" && ext_lower(a.positional()[1]) == "mdz") {
+        const std::string output = a.positional()[1];
+        cli::ensure_writable(output, {input}, a.has("force"));
+        mdz::Reader r = load_mdz(input);
+        write_atomically(output, [&](const std::string& tmp) { mdz::save(tmp, r.trajectory()); });
+        status(ok("Saved " + output + " (" + std::to_string(r.nframes()) + " frames)"));
+        return 0;
+    }
     // Converting to .mdz is compression with the default settings.
     if (!a.has("format") && ext_lower(a.positional()[1]) == "mdz") {
         Args c = a;
@@ -625,7 +635,9 @@ int cmd_info(const Args& a) {
         const auto& ct = r.trajectory();
         const std::size_t raw = ct.raw_size();
         const std::uint64_t size = file_size(input);
-        line("File format", "MDZ v4 (columnar)");
+        char magic[4] = {};
+        std::ifstream(utf8_path(input), std::ios::binary).read(magic, 4);
+        line("File format", magic[3] == 3 ? "MDZ v3 (columnar; `mdz convert` rewrites it as v4)" : "MDZ v4 (columnar)");
         line("Status", r.complete()
                            ? "complete"
                            : "incomplete: not closed by its writer; " + std::to_string(r.status().trailing_bytes) +

@@ -402,6 +402,21 @@ def test_convert_to_mdz_compresses(tmp_path):
     no_temp_files(tmp_path)
 
 
+def test_convert_upgrades_a_v3_file(tmp_path):
+    v3 = ROOT / "tests" / "cpp" / "fixtures" / "v3" / "nacl.mdz"
+    assert b"MDZ v3" in ok(mdz("info", v3)).stdout
+    out = tmp_path / "nacl.mdz"
+    ok(mdz("convert", v3, out))
+    info = ok(mdz("info", out)).stdout
+    assert b"MDZ v4" in info and b"Frames:           42" in info and b"box" in info
+    a, b = tmp_path / "a.xyz", tmp_path / "b.xyz"
+    ok(mdz("convert", v3, a))
+    ok(mdz("convert", out, b))
+    assert a.read_bytes() == b.read_bytes()
+    assert mdz("convert", v3, out).returncode == 1
+    no_temp_files(tmp_path)
+
+
 def test_rigid_compress(tmp_path):
     out = tmp_path / "r.mdz"
     r = ok(mdz("compress", EXAMPLES / "traj.dcd", "-o", out, "--rigid", "--stats"))

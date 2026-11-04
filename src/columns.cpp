@@ -844,4 +844,74 @@ std::vector<float> decompress_positions(const CompressedTrajectory& ct) {
     return std::move(v.f32);
 }
 
+namespace detail {
+
+std::vector<Bytes> split_frame_blob(const ColumnDesc& d, ByteSpan blob, const GofTable& gofs, int level) {
+    if (gofs.empty()) return {};
+    const std::size_t width = d.width, nframes = gofs.nframes();
+    const Count count{sat_mul(nframes, width), false};
+    if (d.dtype == Dtype::F32) {
+        Bytes raw;
+        decompress_tagged(blob, 4, 4, count, raw);
+        std::vector<Bytes> out(gofs.size());
+        if (!raw.empty() && raw[0] == kTagQuantF32) {
+            // Slice the stored integers, so the values are not requantized.
+            ByteSpan body = tagged_body(raw, kTagQuantF32, 4, 4, count, "quant_f32");
+            const std::size_t n = body.size() / 4;
+            for (std::size_t i = 0; i < gofs.size(); ++i) {
+                const auto s = gofs.span(i);
+                const std::size_t lo = std::min(s.start * width, n), hi = std::min(s.end * width, n);
+                Bytes payload(raw.begin(), raw.begin() + 5);
+                put_le<std::uint32_t>(payload, static_cast<std::uint32_t>(hi - lo));
+                payload.insert(payload.end(), body.begin() + 4 * lo, body.begin() + 4 * hi);
+                out[i] = zstd_compress(payload, level);
+            }
+        } else {
+            std::vector<float> v;
+            decode_scalar_f32_payload(raw, count, v);
+            for (std::size_t i = 0; i < gofs.size(); ++i) {
+                const auto s = gofs.span(i);
+                const std::size_t lo = std::min(s.start * width, v.size()), hi = std::min(s.end * width, v.size());
+                out[i] = encode_raw_f32(v.data() + lo, hi - lo, level);
+            }
+        }
+        return out;
+    }
+    GofTable whole;
+    whole.push(nframes);
+    std::vector<std::vector<std::uint8_t>> one{Bytes(blob.begin(), blob.end())};
+    const DecodedColumn v = decode_per_frame(CompressedColumn(d, std::move(one)), 0, nframes, whole);
+    switch (d.dtype) {
+        case Dtype::F64:
+            return encode_frame_groups(kTagRawF64, v.f64, width, gofs, level);
+        case Dtype::I32:
+        case Dtype::U32:
+            return encode_frame_groups(kTagInt32, v.i32, width, gofs, level);
+        case Dtype::I64:
+            return encode_frame_groups(kTagInt64, v.i64, width, gofs, level);
+        default:
+            corrupt("unsupported per_frame dtype " + std::string(dtype_name(d.dtype)));
+    }
+}
+
+std::vector<Bytes> v3_cell_to_box(ByteSpan blob, const GofTable& gofs, int level) {
+    if (gofs.empty()) return {};
+    const std::size_t nframes = gofs.nframes();
+    GofTable whole;
+    whole.push(nframes);
+    std::vector<std::vector<std::uint8_t>> one{Bytes(blob.begin(), blob.end())};
+    const DecodedColumn v = decode_per_frame(
+        CompressedColumn(ColumnDesc::frame_vector("cell", 6, "nm"), std::move(one)), 0, nframes, whole);
+    std::vector<double> box;
+    box.reserve(v.f64.size() / 6 * 9);
+    for (std::size_t f = 0; f + 6 <= v.f64.size(); f += 6) {
+        const double* p = v.f64.data() + f;
+        const Box m = cell_params_to_box({p[0], p[1], p[2], p[3], p[4], p[5]});
+        box.insert(box.end(), m.begin(), m.end());
+    }
+    return encode_frame_groups(kTagRawF64, box, 9, gofs, level);
+}
+
+}  // namespace detail
+
 }  // namespace mdz

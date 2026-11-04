@@ -11,6 +11,7 @@ add_executable(mdz_tests
   test_formats_variable.cpp
   test_variable.cpp
   test_rigid.cpp
+  test_v3.cpp
 )
 target_link_libraries(mdz_tests PRIVATE mdz::mdz)
 # The tests also use internal headers (kernels, codecs) from src/.

@@ -179,7 +179,8 @@ Header decode_header(ByteSpan bytes) {
     if (!has_magic(bytes, 0, kMagic, 4)) {
         if (bytes.size() >= 4 && std::memcmp(bytes.data(), "MDZ", 3) == 0)
             throw Error(ErrorKind::Corrupt, ".mdz container version " + std::to_string(bytes[3]) +
-                                                " is not supported (this build reads version 4)");
+                                                " is not supported here (convert it with `mdz convert old.mdz "
+                                                "new.mdz`)");
         corrupt("not an .mdz file");
     }
     ByteCursor c(bytes, 4);
@@ -317,7 +318,107 @@ void encode_footer(std::uint64_t offset, const std::vector<IndexEntry>& index, B
     put_str(out, std::string_view(kTrailerMagic, 8));
 }
 
+namespace {
+
+// Version 3, written by mdz 0.2 to 0.4: a header, column descriptors each
+// with a group count, an index of (offset u64, size u32) for every blob,
+// optional metadata, then the blobs. Per-atom columns have one blob per
+// group, per-frame columns one blob for the whole file. The blob encodings
+// are those of version 4.
+Loaded load_v3(std::shared_ptr<const void> keep, ByteSpan bytes) {
+    ByteCursor c(bytes, 4);
+    if (c.u16() != 3) corrupt("bad version 3 header");
+    const std::size_t natoms = c.u32();
+    const std::size_t nframes = c.u32();
+    const std::size_t gof_size = c.u16();
+    const std::size_t ncols = c.u16();
+    const std::uint32_t flags = c.u32();
+    c.skip(10);
+    if (gof_size == 0 && nframes) corrupt("group size 0");
+
+    Schema schema;
+    schema.natoms = natoms;
+    schema.gof_size = static_cast<std::uint32_t>(gof_size);
+    std::vector<std::size_t> counts;
+    for (std::size_t i = 0; i < ncols; ++i) {
+        ColumnDesc d;
+        d.name = std::string(c.str(c.u8()));
+        const std::uint8_t dt = c.u8();
+        if (!dtype_from_u8(dt, d.dtype)) corrupt("unknown column dtype byte " + std::to_string(dt));
+        d.width = c.u8();
+        d.per_frame = c.u8() != 0;
+        d.lossy = c.u8() != 0;
+        d.precision = c.f32();
+        d.pred_order = c.u8();
+        d.codec_flags = c.u8();
+        d.anchor_step = c.u8();
+        counts.push_back(c.u32());
+        d.unit = std::string(c.str(c.u8()));
+        schema.columns.push_back(std::move(d));
+    }
+    struct Entry {
+        std::uint64_t offset;
+        std::uint32_t size;
+    };
+    std::vector<std::vector<Entry>> entries(ncols);
+    for (std::size_t k = 0; k < ncols; ++k) {
+        if (counts[k] > c.remaining() / 12) corrupt("blob index runs past the end of the file");
+        for (std::size_t i = 0; i < counts[k]; ++i) {
+            const std::uint64_t off = c.u64();
+            entries[k].push_back({off, c.u32()});
+        }
+    }
+    if (flags & 1) {
+        ByteSpan meta = c.take(c.u32());
+        if (!meta.empty()) schema.metadata = Bytes(meta.begin(), meta.end());
+    }
+    const std::size_t data_start = c.offset();
+
+    struct Owned {
+        std::shared_ptr<const void> file;
+        std::vector<std::vector<Bytes>> blobs;
+    };
+    auto owned = std::make_shared<Owned>();
+    owned->file = std::move(keep);
+    owned->blobs.resize(ncols);
+    GofTable gofs = GofTable::uniform(nframes, gof_size);
+    std::vector<std::vector<ByteSpan>> blobs(ncols);
+    const std::size_t data_len = bytes.size() - data_start;
+    std::vector<std::vector<ByteSpan>> spans(ncols);
+    for (std::size_t k = 0; k < ncols; ++k) {
+        for (const Entry& e : entries[k]) {
+            if (e.offset > data_len || e.size > data_len - e.offset) corrupt("blob runs past the end of the file");
+            spans[k].push_back(bytes.subspan(data_start + static_cast<std::size_t>(e.offset), e.size));
+        }
+        const ColumnDesc d = schema.columns[k];
+        if (!d.per_frame) {
+            if (spans[k].size() != gofs.size())
+                corrupt("column '" + d.name + "' has " + std::to_string(spans[k].size()) + " groups, expected " +
+                        std::to_string(gofs.size()));
+            blobs[k] = std::move(spans[k]);
+            continue;
+        }
+        if (spans[k].size() != (nframes ? 1 : 0)) corrupt("per_frame column '" + d.name + "' must have one blob");
+        if (d.name == "cell" && d.width == 6 && d.dtype == Dtype::F64) {
+            schema.columns[k] = ColumnDesc::frame_vector("box", 9, d.unit);
+            if (nframes) owned->blobs[k] = v3_cell_to_box(spans[k][0], gofs, 3);
+        } else if (nframes) {
+            owned->blobs[k] = split_frame_blob(d, spans[k][0], gofs, 3);
+        }
+        for (const Bytes& b : owned->blobs[k]) blobs[k].push_back(ByteSpan(b.data(), b.size()));
+    }
+
+    Loaded L;
+    L.status.complete = true;
+    L.status.data_end = bytes.size();
+    L.ct = assemble(std::move(schema), std::move(gofs), std::move(blobs), owned, nullptr);
+    return L;
+}
+
+}  // namespace
+
 Loaded load_container(std::shared_ptr<const void> keep, ByteSpan bytes) {
+    if (bytes.size() >= 4 && std::memcmp(bytes.data(), "MDZ\x03", 4) == 0) return load_v3(std::move(keep), bytes);
     const Header h = decode_header(bytes);
     ByteCursor c(bytes, kHeaderSize);
     Schema schema = decode_schema(h, c.take(h.schema_len));
