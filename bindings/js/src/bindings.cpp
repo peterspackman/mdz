@@ -74,10 +74,25 @@ val f32(const std::vector<float>& v) { return typed("Float32Array", v.data(), v.
 val f64(const std::vector<double>& v) { return typed("Float64Array", v.data(), v.size()); }
 val i32(const std::vector<std::int32_t>& v) { return typed("Int32Array", v.data(), v.size()); }
 
+// A string list crosses to JS as one string, split there, rather than one
+// call per string.
 val strings(const std::vector<std::string>& v) {
-    val out = val::array();
-    for (const auto& s : v) out.call<void>("push", val(s));
-    return out;
+    if (v.empty()) return val::array();
+    std::string joined;
+    std::size_t n = 0;
+    for (const auto& s : v) n += s.size() + 1;
+    joined.reserve(n);
+    for (const auto& s : v) {
+        if (s.find('\0') != std::string::npos) {
+            val out = val::array();
+            for (const auto& t : v) out.call<void>("push", val(t));
+            return out;
+        }
+        joined += s;
+        joined += '\0';
+    }
+    joined.pop_back();
+    return val(joined).call<val>("split", val(std::string(1, '\0')));
 }
 
 std::vector<std::uint8_t> bytes_of(const val& u8) {
@@ -88,7 +103,8 @@ std::vector<std::uint8_t> bytes_of(const val& u8) {
 
 mdz::ByteSpan span_of(const std::vector<std::uint8_t>& v) { return {v.data(), v.size()}; }
 
-// Stored lengths to float32 nm, rounded as Reader rounds them.
+// Lengths multiplied by `scale` in double precision and rounded once, as
+// Reader rounds them.
 std::vector<float> to_nm(const std::vector<float>& v, double scale) {
     if (scale == 1.0) return v;
     std::vector<float> out(v.size());
@@ -119,8 +135,8 @@ val atom_strings(const mdz::FrameBatch& b, const char* column) {
 }
 
 // A batch as JS. Per-frame data has nframes entries and per-atom data is
-// packed frame after frame. Lengths are multiplied by `scale` to give nm;
-// other columns are as stored.
+// packed frame after frame. Lengths are multiplied by `scale`; other columns
+// are as stored.
 val batch_to_js(const mdz::FrameBatch& b, double scale) {
     val out = val::object();
     out.set("nframes", static_cast<double>(b.nframes));
@@ -244,15 +260,16 @@ public:
         });
     }
 
-    // Decode a group, or only the named columns of it (see batch_to_js).
-    val decode_group(double gi, const val& record, const val& names) const {
+    // Decode a group, or only the named columns of it (see batch_to_js), with
+    // lengths in nm times `scale`.
+    val decode_group(double gi, const val& record, const val& names, double scale) const {
         return guard([&] {
             std::vector<std::string> cols;
             for (std::size_t i = 0, n = names["length"].as<std::size_t>(); i < n; ++i)
                 cols.push_back(names[i].as<std::string>());
             const std::vector<std::uint8_t> bytes = bytes_of(record);
             mdz::FrameBatch b = r_.decode_group(static_cast<std::size_t>(gi), span_of(bytes), cols);
-            return batch_to_js(b, r_.length_to_nm());
+            return batch_to_js(b, r_.length_to_nm() * scale);
         });
     }
 
@@ -282,25 +299,42 @@ val batch_metadata(const mdz::FrameBatch& b) {
 
 // --- streams over JS memory ---
 
-// Reads a Uint8Array held by JS, a slice at a time, so that the input is never
-// copied whole into the wasm heap.
+// Reads a Uint8Array held by JS in 1 MiB slices, so that the input is never
+// copied whole into the wasm heap and small reads do not each cross to JS.
 class JsInputStream final : public mdz::InputStream {
 public:
     explicit JsInputStream(val bytes) : bytes_(std::move(bytes)), size_(bytes_["length"].as<std::size_t>()) {}
     std::size_t read(void* buf, std::size_t n) override {
-        const std::size_t k = std::min(n, size_ - pos_);
-        if (k == 0) return 0;
-        val(emscripten::typed_memory_view(k, static_cast<std::uint8_t*>(buf)))
-            .call<void>("set", bytes_.call<val>("subarray", static_cast<double>(pos_), static_cast<double>(pos_ + k)));
-        pos_ += k;
-        return k;
+        auto* dst = static_cast<std::uint8_t*>(buf);
+        std::size_t done = 0;
+        while (done < n) {
+            if (at_ == buf_.size() && !refill()) break;
+            const std::size_t k = std::min(n - done, buf_.size() - at_);
+            std::memcpy(dst + done, buf_.data() + at_, k);
+            at_ += k;
+            done += k;
+        }
+        return done;
     }
     const std::string& name() const override { return name_; }
 
 private:
+    bool refill() {
+        const std::size_t k = std::min<std::size_t>(std::size_t(1) << 20, size_ - pos_);
+        buf_.resize(k);
+        at_ = 0;
+        if (k == 0) return false;
+        val(emscripten::typed_memory_view(k, buf_.data()))
+            .call<void>("set", bytes_.call<val>("subarray", static_cast<double>(pos_), static_cast<double>(pos_ + k)));
+        pos_ += k;
+        return true;
+    }
+
     val bytes_;
     std::size_t size_;
     std::size_t pos_ = 0;
+    std::vector<std::uint8_t> buf_;
+    std::size_t at_ = 0;
     std::string name_ = "<input>";
 };
 
@@ -330,14 +364,22 @@ val take_bytes(std::vector<std::uint8_t>& buf) {
 
 // --- options from JS ---
 
-bool has(const val& o, const char* key) {
-    return o.typeOf().as<std::string>() == "object" && !o.isNull() && !o[key].isUndefined() && !o[key].isNull();
-}
-
+// A string list from JS, joined there and split here.
 std::vector<std::string> string_list(const val& a) {
     std::vector<std::string> out;
-    for (std::size_t i = 0, n = a["length"].as<std::size_t>(); i < n; ++i) out.push_back(a[i].as<std::string>());
-    return out;
+    if (a["length"].as<std::size_t>() == 0) return out;
+    const std::string joined = a.call<std::string>("join", val(std::string(1, '\0')));
+    std::size_t start = 0;
+    for (;;) {
+        const std::size_t end = joined.find('\0', start);
+        out.push_back(joined.substr(start, end == std::string::npos ? std::string::npos : end - start));
+        if (end == std::string::npos) return out;
+        start = end + 1;
+    }
+}
+
+bool has(const val& o, const char* key) {
+    return o.typeOf().as<std::string>() == "object" && !o.isNull() && !o[key].isUndefined() && !o[key].isNull();
 }
 
 // Numbers from any array-like, in one copy: converted to `Type` (such as
@@ -417,7 +459,7 @@ val parse(const val& bytes, const std::string& format, const val& opts) {
         std::optional<mdz::FrameBatch> b = reader->read_all();
         if (!b || b->nframes == 0) throw mdz::Error(mdz::ErrorKind::Corrupt, "no frames in the " + format + " input");
         if (b->units) b = b->in_internal_units();
-        val out = batch_to_js(*b, 1.0);
+        val out = batch_to_js(*b, has(opts, "lengthScale") ? opts["lengthScale"].as<double>() : 1.0);
         out.set("metadata", batch_metadata(*b));
         return out;
     });
@@ -484,6 +526,7 @@ public:
                                  "with variableAtoms the atoms change between frames: pass ids, elements, names and "
                                  "types with each frame instead");
             variable_ = c.variable_atoms;
+            if (has(opts, "lengthScale")) to_nm_ = 1.0 / opts["lengthScale"].as<double>();
             writer_ = std::make_unique<mdz::Writer>(mdz::Writer::create(std::make_unique<DrainStream>(&buf_), c));
             return 0;
         });
@@ -492,7 +535,9 @@ public:
     // One frame, with lengths in nm. See lib/index.js for the fields.
     void write(const val& frame) {
         guard([&] {
-            const std::vector<float> pos = floats(frame["positions"]);
+            std::vector<float> pos = floats(frame["positions"]);
+            if (to_nm_ != 1.0)
+                for (float& x : pos) x = static_cast<float>(static_cast<double>(x) * to_nm_);
             if (pos.size() % 3 != 0)
                 throw mdz::Error(mdz::ErrorKind::InvalidInput, "positions must hold 3 values per atom");
             const std::size_t n = pos.size() / 3;
@@ -523,7 +568,8 @@ public:
                     b.frame_props[k] = {sc[k].as<double>()};
             }
             if (has(frame, "cell")) {
-                const std::vector<double> m = doubles(frame["cell"]);
+                std::vector<double> m = doubles(frame["cell"]);
+                for (double& x : m) x *= to_nm_;
                 if (m.size() != 9) throw mdz::Error(mdz::ErrorKind::InvalidInput, "cell must hold 9 values");
                 mdz::Box box;
                 std::copy(m.begin(), m.end(), box.begin());
@@ -573,6 +619,7 @@ private:
     std::vector<std::uint8_t> buf_;
     mdz::FrameBatch meta_;
     bool variable_ = false;
+    double to_nm_ = 1.0;
     std::unique_ptr<mdz::Writer> writer_;
 };
 

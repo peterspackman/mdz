@@ -112,11 +112,6 @@ export async function open(input, options = {}) {
   return new Trajectory(lazy, src, lengthUnit, scale, options.cacheBytes ?? DEFAULT_CACHE_BYTES);
 }
 
-function scaleInPlace(a, s) {
-  if (a && s !== 1) for (let i = 0; i < a.length; ++i) a[i] *= s;
-  return a;
-}
-
 function iota(n) {
   const a = new Int32Array(n);
   for (let i = 0; i < n; ++i) a[i] = i;
@@ -212,10 +207,7 @@ export class Trajectory {
   async #decode(gi, columns) {
     const offset = this.#groups[4 * gi];
     const bytes = await readRange(this.#src, offset, offset + this.#groups[4 * gi + 1]);
-    const g = this.#reader().decodeGroup(gi, bytes, columns);
-    scaleInPlace(g.positions, this.#scale);
-    scaleInPlace(g.cells, this.#scale);
-    scaleInPlace(g.origins, this.#scale);
+    const g = this.#reader().decodeGroup(gi, bytes, columns, this.#scale);
     g.first = this.#first(gi);
     g.offsets = new Float64Array(g.nframes + 1);
     for (let k = 0; k < g.nframes; ++k) g.offsets[k + 1] = g.offsets[k] + g.natoms[k];
@@ -509,7 +501,7 @@ function lengthScale(options) {
 
 // Options for the C++ side: precision in nm, everything else as given.
 function coreOptions(options, scale) {
-  const out = { ...options };
+  const out = { ...options, lengthScale: scale };
   if (options.precision !== undefined) out.precision = options.precision / scale;
   return out;
 }
@@ -528,10 +520,7 @@ export async function parse(input, options = {}) {
   const scale = lengthScale(options);
   const core = await initFull();
   const format = await formatOf(core, options.format, input, 'input');
-  const f = core.parse(await wholeBytes(input), format, options);
-  scaleInPlace(f.positions, scale);
-  scaleInPlace(f.cells, scale);
-  scaleInPlace(f.origins, scale);
+  const f = core.parse(await wholeBytes(input), format, { ...options, lengthScale: scale });
   f.frameNatoms = f.natoms;
   f.variableAtoms = f.ids !== undefined;
   f.natoms = f.variableAtoms ? 0 : (f.frameNatoms[0] ?? 0);
@@ -561,18 +550,16 @@ export async function convert(input, options = {}) {
 export async function createWriter(options = {}) {
   const scale = lengthScale(options);
   const core = await initFull();
-  return new Writer(new core.Writer(coreOptions(options, scale)), scale, options.onData);
+  return new Writer(new core.Writer(coreOptions(options, scale)), options.onData);
 }
 
 export class Writer {
   #w;
-  #scale;
   #onData;
   #chunks = [];
 
-  constructor(writer, scale, onData) {
+  constructor(writer, onData) {
     this.#w = writer;
-    this.#scale = scale;
     this.#onData = onData;
   }
 
@@ -588,14 +575,6 @@ export class Writer {
     else this.#chunks.push(bytes);
   }
 
-  #toNm(a) {
-    if (a === undefined || a === null) return undefined;
-    if (this.#scale === 1) return a;
-    const out = Float64Array.from(a);
-    for (let i = 0; i < out.length; ++i) out[i] /= this.#scale;
-    return out;
-  }
-
   /**
    * Add a frame: { positions, cell?, velocities?, forces?, charge?, time?,
    * energy?, step?, scalars?, columns?, ids?, elements?, names?, types? }.
@@ -604,7 +583,7 @@ export class Writer {
   write(frame) {
     const w = this.#writer();
     if (!frame?.positions?.length) throw new MdzError('write() needs a frame with positions', 'InvalidInput');
-    w.write({ ...frame, positions: this.#toNm(frame.positions), cell: this.#toNm(frame.cell) });
+    w.write(frame);
     this.#drain();
   }
 
