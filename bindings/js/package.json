@@ -16,7 +16,8 @@
     "README.md",
     "dist/mdz_core.mjs",
     "dist/mdz_core.wasm",
-    "dist/mdz_core.d.ts",
+    "dist/mdz_full.mjs",
+    "dist/mdz_full.wasm",
     "dist/LICENSE",
     "dist/THIRD_PARTY_LICENSES"
   ],

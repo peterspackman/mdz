@@ -8,9 +8,11 @@ root="$(cd "$here/../.." && pwd)"
 build="$here/build-wasm"
 
 emcmake cmake -S "$root" -B "$build" -G Ninja -DCMAKE_BUILD_TYPE="${1:-Release}"
-cmake --build "$build" --target mdz_core
+cmake --build "$build" --target mdz_core mdz_full
+rm -rf "$here/dist"
 mkdir -p "$here/dist"
-cp "$build/bindings/js/mdz_core.mjs" "$build/bindings/js/mdz_core.wasm" "$here/dist/"
-cp "$build/mdz_core.d.ts" "$here/dist/" 2>/dev/null || cp "$build/bindings/js/mdz_core.d.ts" "$here/dist/"
+for m in mdz_core mdz_full; do
+  cp "$build/bindings/js/$m.mjs" "$build/bindings/js/$m.wasm" "$here/dist/"
+done
 # The package ships the licenses of everything compiled into the wasm.
 cp "$root/LICENSE" "$root/THIRD_PARTY_LICENSES" "$here/dist/"

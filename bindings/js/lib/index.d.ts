@@ -32,7 +32,10 @@ export interface InitOptions {
   instantiateWasm?: (imports: WebAssembly.Imports, done: (instance: WebAssembly.Instance) => void) => unknown;
 }
 
+/** Load the reader module. open() calls it. */
 export function init(options?: InitOptions): Promise<unknown>;
+/** Load the module for writing and other formats. The functions that need it call it. */
+export function initFull(options?: InitOptions): Promise<unknown>;
 export function version(): Promise<string>;
 export function open(
   input: Uint8Array | ArrayBuffer | ArrayBufferView | Blob | ByteSource,
@@ -143,3 +146,125 @@ export class Trajectory implements Disposable {
   close(): void;
   [Symbol.dispose](): void;
 }
+
+// --- writing .mdz ---
+
+export interface CompressOptions {
+  /** Unit of positions, cells and precision. Default 'nm'. */
+  lengthUnit?: LengthUnit;
+  /** Quantization step of positions. Default 0.000125 nm. */
+  precision?: number;
+  /** Per-column steps in each column's internal unit, such as { forces: 1.0 }. */
+  columnPrecision?: Record<string, number>;
+  gofSize?: number;
+  predictorOrder?: number;
+  zstdLevel?: number;
+  adaptive?: boolean;
+  anchorStep?: number;
+  codec?: 'auto' | 'temporal' | 'intra' | 'lossless';
+  lossless?: boolean;
+  /** Let the atom count change between frames; each frame then passes ids. */
+  variableAtoms?: boolean;
+  rigid?: boolean;
+}
+
+export interface WriterOptions extends CompressOptions {
+  /** Static per-atom metadata, natoms entries each. Not with variableAtoms. */
+  elements?: string[];
+  atomNames?: string[];
+  atomTypes?: ArrayLike<number>;
+  atomIds?: ArrayLike<number>;
+  /** Rigid body of each atom, or -1 for none. */
+  bodies?: ArrayLike<number>;
+  /** Receives the file's bytes as groups are written. close() then returns undefined. */
+  onData?: (bytes: Uint8Array) => void;
+}
+
+export interface FrameInput {
+  /** natoms * 3 values in lengthUnit. */
+  positions: ArrayLike<number>;
+  /** 3x3 row-major, rows a, b, c, in lengthUnit. */
+  cell?: ArrayLike<number>;
+  velocities?: ArrayLike<number>;
+  forces?: ArrayLike<number>;
+  charge?: ArrayLike<number>;
+  time?: number;
+  energy?: number;
+  step?: number;
+  scalars?: Record<string, number>;
+  /** Other per-atom columns. Int32Array columns are stored as integers. */
+  columns?: Record<string, ArrayLike<number>>;
+  /** With variableAtoms: the frame's atom ids and attributes. */
+  ids?: ArrayLike<number>;
+  elements?: string[];
+  names?: string[];
+  types?: ArrayLike<number>;
+}
+
+export function createWriter(options?: WriterOptions): Promise<Writer>;
+
+export class Writer {
+  readonly framesWritten: number;
+  readonly framesCommitted: number;
+  write(frame: FrameInput): void;
+  flush(): void;
+  close(): Uint8Array | undefined;
+}
+
+export function compress(
+  positions: ArrayLike<number>,
+  options: CompressOptions & { natoms: number; cells?: ArrayLike<number> },
+): Promise<Uint8Array>;
+
+// --- other formats ---
+
+export interface FormatInfo {
+  name: string;
+  extensions: string[];
+  readable: boolean;
+  writable: boolean;
+}
+
+export function formats(): Promise<FormatInfo[]>;
+
+type TextOrBytes = string | Uint8Array | ArrayBuffer | ArrayBufferView | Blob | ByteSource;
+
+export interface ParseOptions {
+  /** Format name; defaults to the one matching input.name. */
+  format?: string;
+  lengthUnit?: LengthUnit;
+  /** LAMMPS unit style of a dump. Default 'real'. */
+  lammpsUnits?: string;
+}
+
+/** Every frame, packed. Lengths in lengthUnit; other values in internal units. */
+export interface Frames {
+  /** Atoms per frame, or 0 if the count varies. */
+  natoms: number;
+  nframes: number;
+  variableAtoms: boolean;
+  frameNatoms: Float64Array;
+  positions: Float32Array;
+  cells: Float32Array | null;
+  origins?: Float32Array;
+  scalars: Record<string, Float64Array>;
+  columns: Record<string, Float32Array | Int32Array>;
+  /** Per atom of every frame, when the count varies. */
+  ids?: Int32Array;
+  elements?: string[];
+  names?: string[];
+  types?: Int32Array;
+  metadata: Metadata;
+}
+
+export function parse(input: TextOrBytes, options?: ParseOptions): Promise<Frames>;
+
+export interface ConvertOptions extends CompressOptions {
+  /** Input format; defaults to the one matching input.name. */
+  from?: string;
+  /** Output format, such as 'mdz', 'xyz' or 'lammps'. */
+  to: string;
+  lammpsUnits?: string;
+}
+
+export function convert(input: TextOrBytes, options: ConvertOptions): Promise<Uint8Array>;

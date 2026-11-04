@@ -1,7 +1,10 @@
-// Read .mdz trajectories in browsers and Node.
+// Read and write .mdz trajectories, and parse and convert other formats, in
+// browsers and Node.
 //
 // open() reads the header and the group index; each group of frames is read
 // and decoded when a frame in it is first asked for, and kept in an LRU cache.
+// Writing and the other formats use a larger module (mdz_full), loaded the
+// first time one of them is used.
 
 import createMdzCore from '../dist/mdz_core.mjs';
 
@@ -23,6 +26,20 @@ export function init(options = {}) {
     });
   }
   return corePromise;
+}
+
+let fullPromise = null;
+
+export function initFull(options = {}) {
+  if (!fullPromise) {
+    fullPromise = import('../dist/mdz_full.mjs')
+      .then((m) => m.default({ ...options, MdzError }))
+      .catch((e) => {
+        fullPromise = null;
+        throw e;
+      });
+  }
+  return fullPromise;
 }
 
 export async function version() {
@@ -461,4 +478,180 @@ export class Trajectory {
   [Symbol.dispose]() {
     this.close();
   }
+}
+
+// --- other formats ---
+
+async function wholeBytes(input) {
+  if (typeof input === 'string') return new TextEncoder().encode(input);
+  if (input instanceof Uint8Array) return input;
+  if (input instanceof ArrayBuffer) return new Uint8Array(input);
+  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  if (typeof Blob !== 'undefined' && input instanceof Blob) return new Uint8Array(await input.arrayBuffer());
+  if (input && typeof input.size === 'number' && typeof input.read === 'function') return readRange(input, 0, input.size);
+  throw new MdzError('expected a string, Uint8Array, ArrayBuffer, Blob or byte source', 'InvalidInput');
+}
+
+async function formatOf(core, given, input, what) {
+  if (given) return given;
+  const name = typeof input?.name === 'string' ? input.name : '';
+  const detected = name && core.detectFormat(name);
+  if (!detected) throw new MdzError(`cannot tell the ${what} format: pass { ${what === 'input' ? 'from' : 'to'} }`, 'InvalidInput');
+  return detected;
+}
+
+function lengthScale(options) {
+  const unit = options.lengthUnit ?? 'nm';
+  const scale = LENGTH_SCALE[unit];
+  if (scale === undefined) throw new MdzError(`unknown lengthUnit '${unit}' (use 'nm' or 'angstrom')`, 'InvalidInput');
+  return scale;
+}
+
+// Options for the C++ side: precision in nm, everything else as given.
+function coreOptions(options, scale) {
+  const out = { ...options };
+  if (options.precision !== undefined) out.precision = options.precision / scale;
+  return out;
+}
+
+/** The trajectory formats, with their file extensions. */
+export async function formats() {
+  return (await initFull()).formats();
+}
+
+/**
+ * Parse a whole trajectory file in any supported format. `format` defaults to
+ * the one matching `input.name` (a File). Lengths are in lengthUnit; other
+ * values are in mdz's internal units (nm/ps, kJ/mol/nm, ...).
+ */
+export async function parse(input, options = {}) {
+  const scale = lengthScale(options);
+  const core = await initFull();
+  const format = await formatOf(core, options.format, input, 'input');
+  const f = core.parse(await wholeBytes(input), format, options);
+  scaleInPlace(f.positions, scale);
+  scaleInPlace(f.cells, scale);
+  scaleInPlace(f.origins, scale);
+  f.frameNatoms = f.natoms;
+  f.variableAtoms = f.ids !== undefined;
+  f.natoms = f.variableAtoms ? 0 : (f.frameNatoms[0] ?? 0);
+  f.cells ??= null;
+  return f;
+}
+
+/**
+ * Convert a trajectory between formats, returning the bytes of the output.
+ * `from` defaults to the format matching `input.name`; `to` is a format name
+ * such as 'mdz', 'xyz' or 'lammps'. Compression options apply to 'mdz'.
+ */
+export async function convert(input, options = {}) {
+  const scale = lengthScale(options);
+  const core = await initFull();
+  const from = await formatOf(core, options.from, input, 'input');
+  if (!options.to) throw new MdzError('convert() needs { to }, the output format', 'InvalidInput');
+  return core.convert(await wholeBytes(input), from, options.to, coreOptions(options, scale));
+}
+
+// --- writing .mdz ---
+
+/**
+ * Write a .mdz file frame by frame. Bytes are handed to `onData` as groups
+ * are completed, or returned by close() if there is no onData.
+ */
+export async function createWriter(options = {}) {
+  const scale = lengthScale(options);
+  const core = await initFull();
+  return new Writer(new core.Writer(coreOptions(options, scale)), scale, options.onData);
+}
+
+export class Writer {
+  #w;
+  #scale;
+  #onData;
+  #chunks = [];
+
+  constructor(writer, scale, onData) {
+    this.#w = writer;
+    this.#scale = scale;
+    this.#onData = onData;
+  }
+
+  #writer() {
+    if (!this.#w) throw new MdzError('the writer is closed', 'InvalidInput');
+    return this.#w;
+  }
+
+  #drain() {
+    const bytes = this.#w.take();
+    if (bytes.length === 0) return;
+    if (this.#onData) this.#onData(bytes);
+    else this.#chunks.push(bytes);
+  }
+
+  #toNm(a) {
+    if (a === undefined || a === null) return undefined;
+    if (this.#scale === 1) return a;
+    const out = Float64Array.from(a);
+    for (let i = 0; i < out.length; ++i) out[i] /= this.#scale;
+    return out;
+  }
+
+  /**
+   * Add a frame: { positions, cell?, velocities?, forces?, charge?, time?,
+   * energy?, step?, scalars?, columns?, ids?, elements?, names?, types? }.
+   * positions and cell are in lengthUnit.
+   */
+  write(frame) {
+    const w = this.#writer();
+    if (!frame?.positions?.length) throw new MdzError('write() needs a frame with positions', 'InvalidInput');
+    w.write({ ...frame, positions: this.#toNm(frame.positions), cell: this.#toNm(frame.cell) });
+    this.#drain();
+  }
+
+  /** Encode buffered frames as a group, which may be short. */
+  flush() {
+    this.#writer().flush();
+    this.#drain();
+  }
+
+  /** Finish the file. Returns its bytes, unless onData was given. */
+  close() {
+    const w = this.#writer();
+    try {
+      w.close();
+      this.#drain();
+    } finally {
+      w.delete();
+      this.#w = null;
+    }
+    if (this.#onData) return undefined;
+    const out = concat(this.#chunks, Uint8Array);
+    this.#chunks = [];
+    return out;
+  }
+
+  get framesWritten() { return this.#writer().framesWritten; }
+  get framesCommitted() { return this.#writer().framesCommitted; }
+}
+
+/**
+ * Compress positions, nframes * natoms * 3 values in lengthUnit, with optional
+ * cells (9 per frame), to the bytes of a .mdz file.
+ */
+export async function compress(positions, options = {}) {
+  const { natoms } = options;
+  if (!ArrayBuffer.isView(positions)) positions = Float32Array.from(positions);
+  const cells = options.cells && (ArrayBuffer.isView(options.cells) ? options.cells : Float64Array.from(options.cells));
+  if (!Number.isInteger(natoms) || natoms <= 0 || positions.length % (natoms * 3) !== 0)
+    throw new MdzError('compress() needs natoms, with positions holding natoms * 3 values per frame', 'InvalidInput');
+  const nframes = positions.length / (natoms * 3);
+  if (cells && cells.length !== nframes * 9)
+    throw new MdzError(`cells must hold 9 values per frame (${nframes * 9})`, 'InvalidInput');
+  const w = await createWriter({ ...options, natoms: undefined, cells: undefined });
+  for (let f = 0; f < nframes; ++f) {
+    const frame = { positions: positions.subarray(f * natoms * 3, (f + 1) * natoms * 3) };
+    if (cells) frame.cell = cells.subarray(9 * f, 9 * f + 9);
+    w.write(frame);
+  }
+  return w.close();
 }

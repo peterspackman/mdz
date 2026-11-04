@@ -313,4 +313,7 @@ scrubs a 78k-atom trajectory.
 - Optional format converters (xyz, lammps, dcd → mdz in the browser). They are
   not needed by cebuns, which has its own parsers, and they cost size.
 - `-msimd128`, if profiling shows decode time matters.
-**Status**: Not Started
+**Status**: Complete
+- `createWriter` / `compress` cover writing `.mdz`, `parse` / `convert` cover the other formats, and `formats` lists them.
+- Writing and the formats live in a second module (`mdz_full`, 404 kB gzipped) that is loaded on first use. The reader stays at 101 kB gzipped.
+- Not done: the cheaper whole-file scalars (option (b)) and `-msimd128`.
