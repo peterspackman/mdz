@@ -1,7 +1,10 @@
 # dump mdz with rigid bodies taken from the molecules: run with
 #   lmp -var plugin /path/to/mdzplugin.so -in in.rigid
+# or, for a LAMMPS with dump mdz compiled in (the package MDZ),
+#   lmp -var builtin yes -in in.rigid
 # then python3 check.py /path/to/mdz (see run.sh).
-plugin load ${plugin}
+variable builtin index no
+if "${builtin} == no" then "plugin load ${plugin}"
 units metal
 atom_style molecular
 lattice sc 4.0

@@ -1,0 +1,14 @@
+This package provides dump style mdz, which writes compressed,
+crash-tolerant, appendable .mdz trajectories with the fields of dump custom.
+
+It is not part of the LAMMPS distribution: the patch_lammps.sh script in the
+lammps/ directory of the mdz repository puts it into a LAMMPS source tree.
+Build LAMMPS with CMake and -D PKG_MDZ=ON. LAMMPS then builds the mdz library
+from the mdz source tree that patched it (set MDZ_SOURCE_DIR to use another)
+and links it in. The traditional make build is not supported.
+
+Documentation, the file format and readers for Python, C and C++ and the
+command line: https://github.com/peterspackman/mdz (lammps/README.md for the
+dump style and its dump_modify keywords).
+
+Author: Peter Spackman (peterspackman@fastmail.com)

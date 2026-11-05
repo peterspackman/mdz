@@ -1,5 +1,5 @@
 # A minimal downstream project that uses mdz in one of the two supported ways:
-#   -DMODE=subdir   add_subdirectory(<mdz source>), as the LAMMPS plugin does
+#   -DMODE=subdir   add_subdirectory(<mdz source>), as the LAMMPS plugin and package do
 #   -DMODE=package  find_package(mdz) against an installed copy
 cmake_minimum_required(VERSION 3.18)
 project(mdz_consumer LANGUAGES CXX)

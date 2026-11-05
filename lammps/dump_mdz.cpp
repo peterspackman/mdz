@@ -51,7 +51,7 @@
 #include "update.h"
 
 #include "mdz/mdz.h"
-#ifdef MDZ_PLUGIN_SERIAL
+#ifdef MDZ_LAMMPS_SERIAL
 #include "mdz/mdz.hpp"
 #endif
 
@@ -102,8 +102,8 @@ DumpMDZ::DumpMDZ(LAMMPS* lmp, int narg, char** arg)
     sortcol = 0;
     flush_flag = 0;
     map_fields();
-#ifdef MDZ_PLUGIN_SERIAL
-    // built with MDZ_PARALLEL=off, so mdz runs only on the writing rank's thread
+#ifdef MDZ_LAMMPS_SERIAL
+    // built with MDZ_PARALLEL=off: mdz runs only on the thread of the writing rank
     mdz::set_num_threads(1);
 #endif
 }

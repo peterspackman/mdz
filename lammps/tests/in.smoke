@@ -1,7 +1,10 @@
 # Smoke test for dump mdz: run with
 #   lmp -var plugin /path/to/mdzplugin.so -in in.smoke
+# or, for a LAMMPS with dump mdz compiled in (the package MDZ),
+#   lmp -var builtin yes -in in.smoke
 # then python3 check.py /path/to/mdz (see run.sh).
-plugin load ${plugin}
+variable builtin index no
+if "${builtin} == no" then "plugin load ${plugin}"
 units metal
 atom_style atomic
 lattice fcc 5.26

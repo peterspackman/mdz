@@ -1,7 +1,10 @@
 # dump mdz with atoms coming and going: run with
 #   lmp -var plugin /path/to/mdzplugin.so -in in.variable
+# or, for a LAMMPS with dump mdz compiled in (the package MDZ),
+#   lmp -var builtin yes -in in.variable
 # then python3 check.py /path/to/mdz (see run.sh).
-plugin load ${plugin}
+variable builtin index no
+if "${builtin} == no" then "plugin load ${plugin}"
 units metal
 atom_style atomic
 lattice fcc 5.26
