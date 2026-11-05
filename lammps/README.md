@@ -15,57 +15,124 @@ A LAMMPS dump style that writes `.mdz` trajectories:
   that style, the box (triclinic tilt and origin), the boundary flags, the
   timestep and the simulation time
 
-It is built as a plugin, so you don't need to rebuild LAMMPS. The LAMMPS
-binary must include the `PLUGIN` package.
+There are two ways to add it to LAMMPS:
 
-## Building
+- **Compiled in, as the package MDZ** (recommended if you build LAMMPS):
+  LAMMPS's own CMake build compiles dump mdz and the mdz library with its
+  compiler and flags, so nothing can mismatch.
+- **As a plugin**, for a LAMMPS binary you cannot rebuild. It needs the
+  `PLUGIN` package in that binary, and must be built with the same
+  compiler and C++ standard as it.
 
-You need CMake (3.20 or later), a C++17 compiler, and the source tree LAMMPS
-was built from (for its headers):
+## Compiling it into LAMMPS
+
+Put the package into your LAMMPS source tree, then configure LAMMPS with
+`-D PKG_MDZ=ON` as well as your usual settings:
+
+```sh
+lammps/patch_lammps.sh /path/to/lammps        # --link to symlink, not copy
+cmake -S /path/to/lammps/cmake -B build-lammps -D PKG_MDZ=ON ...
+cmake --build build-lammps
+```
+
+The script copies `dump_mdz.cpp` and `dump_mdz.h` into `src/MDZ`, adds
+`cmake/Modules/Packages/MDZ.cmake`, and registers the package in
+`cmake/CMakeLists.txt`. Running it again updates the tree. LAMMPS then
+builds the mdz library (only the library, as static, position-independent
+code) from this checkout, whose path the script records; set
+`-D MDZ_SOURCE_DIR=/path/to/mdz` to use another. zstd is downloaded and
+compiled in at configure time; `-D MDZ_ZSTD=system` uses an installed zstd
+instead. Only the CMake build of LAMMPS is supported.
+
+It works with C++17 and C++20 builds, with MPI or serial, and with the
+KOKKOS package: dump mdz runs on the host, and LAMMPS copies the atom data
+there before it writes any dump.
+
+## Building the plugin
+
+You need CMake (3.20 or later), a C++17 compiler, and the CMake build
+directory of the LAMMPS binary (or at least the source tree it was built
+from):
+
+```sh
+cmake -S lammps -B build-plugin -D LAMMPS_BUILD_DIR=/path/to/lammps/build
+cmake --build build-plugin
+```
+
+`LAMMPS_BUILD_DIR` supplies what the plugin must share with LAMMPS: the C++
+compiler, the C++ standard (read from LAMMPS's compile flags), `BUILD_MPI`,
+`LAMMPS_SIZES` and the LAMMPS source tree. Setting any of these to
+something else is an error.
+
+Without a LAMMPS build directory, give the source tree and match the rest by
+hand:
 
 ```sh
 cmake -S lammps -B build-plugin \
       -D LAMMPS_SOURCE_DIR=/path/to/lammps/src \
-      -D BUILD_MPI=on        # must match your LAMMPS binary (off for serial)
-cmake --build build-plugin
+      -D CMAKE_CXX_COMPILER=...  # the compiler LAMMPS was built with
+      -D CMAKE_CXX_STANDARD=20   # the standard LAMMPS was built with
+      -D BUILD_MPI=on            # on with MPI, off for a serial LAMMPS
 ```
 
-Use the same compiler and C++ standard as the LAMMPS build. LAMMPS's
-headers change with the standard: built as C++20 they use `std::format`
-in place of the bundled fmt library, and a plugin built as C++17 against
-such a binary fails to load with an `undefined symbol` error naming
-`LAMMPS_NS::Error`. LAMMPS builds with the KOKKOS package use C++20, so add
-`-D CMAKE_CXX_STANDARD=20` for those. The LAMMPS configure summary prints
-the standard it used ("C++ Standard").
+The LAMMPS configure summary prints the compiler and standard ("C++
+Compiler", "C++ Standard"). LAMMPS builds with the KOKKOS package use C++20.
+
+**Why the compiler matters, not just the standard.** Built as C++20 (with a
+standard library that has it), LAMMPS's `fmt::` is `std::format`, whose code
+is instantiated from templates in each binary that uses it, the plugin
+included. Its layout was not ABI-stable before GCC 15, so the copies in a
+LAMMPS built with one compiler or libstdc++ version and in a plugin built
+with another can disagree. A plugin that called LAMMPS's copies crashed formatting a
+message of its own (seen with LAMMPS built by hipcc on GCC 15's libstdc++
+and the plugin by GCC 14). A plugin built as C++17 against such
+a LAMMPS fails to load instead, with an `undefined symbol` error naming
+`LAMMPS_NS::Error`.
+
+The plugin guards against this as far as it can: it is linked with a
+version script that exports only `lammpsplugin_init`, so it always runs its
+own instantiations rather than binding to LAMMPS's. Messages it hands to
+LAMMPS (errors, warnings) still cross between the two, so build it with
+LAMMPS's compiler, which `LAMMPS_BUILD_DIR` does for you.
 
 This builds the mdz library from this repository (C++17 or later; its one
 dependency, zstd, is downloaded and compiled in) and links it statically
 into `build-plugin/mdzplugin.so`. To use an installed zstd instead, add
 `-D MDZ_ZSTD=system`.
 
-By default the plugin restricts mdz to a single thread, the thread of the
-rank that writes the file. `-D MDZ_PARALLEL=on` lets mdz start its own worker
-threads (one per core, or `MDZ_NUM_THREADS`). mdz parallelizes across groups
-of frames, and dump mdz compresses one group at a time, so this option
-currently has no effect on speed.
+Then load it in the input script, before the first `dump mdz`:
 
-To check the build, run the smoke test against your LAMMPS binary. It needs
-the mdz command-line tool, built from the repository root:
+```
+plugin load /path/to/mdzplugin.so
+```
+
+## Threads and checking the build
+
+By default dump mdz restricts mdz to a single thread, the thread of the
+rank that writes the file. `-D MDZ_PARALLEL=on` (for the package or the
+plugin) lets mdz start its own worker threads (one per core, or
+`MDZ_NUM_THREADS`). mdz parallelizes across groups of frames, and dump mdz
+compresses one group at a time, so this option currently has no effect on
+speed.
+
+To check the build, run the smoke test against your LAMMPS binary, with the
+plugin or with `builtin` for the package. It needs the mdz command-line
+tool, built from the repository root:
 
 ```sh
 cmake -S . -B build && cmake --build build --target mdz_cli
 lammps/tests/run.sh /path/to/lmp build-plugin/mdzplugin.so build/cli/mdz
+lammps/tests/run.sh /path/to/lmp builtin build/cli/mdz
 ```
 
 It also checks a run whose atoms change (`in.variable`, with `fix deposit`
 and `delete_atoms`) and, if LAMMPS has the MOLECULE and RIGID packages,
-rigid molecules (`in.rigid`).
+rigid molecules (`in.rigid`). Set `MPIRUN`, for example `MPIRUN="mpirun -np
+2"`, to run LAMMPS in parallel.
 
 ## Usage
 
 ```
-plugin load /path/to/mdzplugin.so
-
 compute pe all pe/atom
 dump traj all mdz 100 traj.mdz id type x y z ix iy iz vx vy vz c_pe
 dump_modify traj precision 0.001
@@ -185,7 +252,7 @@ reports the frame count.
 - **Restricted triclinic box:** the box is stored in LAMMPS's restricted
   triclinic form, as LAMMPS holds it internally. A general triclinic box is
   stored in that restricted frame.
-- **Not in `plugin list`:** LAMMPS's plugin loader does not handle dump
+- **Plugin: not in `plugin list`:** LAMMPS's plugin loader does not handle dump
   styles, so the plugin adds `dump mdz` to the style table itself. It works
   with current and older LAMMPS versions, but it does not appear in `plugin
   list` and cannot be unloaded.

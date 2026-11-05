@@ -173,8 +173,12 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel --target mdz_cli
       - name: Build the plugin
         run: |
-          cmake -S lammps -B build-plugin -D LAMMPS_SOURCE_DIR="$RUNNER_TEMP/lammps/src" -D BUILD_MPI=on
+          cmake -S lammps -B build-plugin -D LAMMPS_BUILD_DIR="$RUNNER_TEMP/lammps/build"
           cmake --build build-plugin
+      - name: The plugin exports only lammpsplugin_init
+        run: |
+          nm -D --defined-only build-plugin/mdzplugin.so
+          test "$(nm -D --defined-only build-plugin/mdzplugin.so | awk '{print $3}')" = lammpsplugin_init
       - name: Smoke test
         run: >
           lammps/tests/run.sh "$RUNNER_TEMP/lammps/build/lmp"
@@ -185,3 +189,23 @@ jobs:
         run: >
           lammps/tests/run.sh "$RUNNER_TEMP/lammps/build/lmp"
           "$PWD/build-plugin/mdzplugin.so" "$PWD/build/cli/mdz"
+
+  # Compile dump mdz into a serial LAMMPS as the package MDZ, and run the
+  # same smoke test.
+  lammps-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Fetch LAMMPS (stable branch)
+        run: git clone --depth 1 --branch stable https://github.com/lammps/lammps.git "$RUNNER_TEMP/lammps"
+      - name: Add the package MDZ
+        run: lammps/patch_lammps.sh "$RUNNER_TEMP/lammps"
+      - name: Build LAMMPS
+        run: |
+          cmake -S "$RUNNER_TEMP/lammps/cmake" -B "$RUNNER_TEMP/lammps/build" -D BUILD_MPI=off -D BUILD_OMP=off \
+            -D PKG_MDZ=on -D PKG_MOLECULE=on -D PKG_RIGID=on -D CMAKE_BUILD_TYPE=Release
+          cmake --build "$RUNNER_TEMP/lammps/build" -j 4
+      - name: Build the mdz CLI
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --parallel --target mdz_cli
+      - name: Smoke test
+        run: lammps/tests/run.sh "$RUNNER_TEMP/lammps/build/lmp" builtin "$PWD/build/cli/mdz"
