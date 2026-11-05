@@ -20,7 +20,14 @@ using namespace LAMMPS_NS;
 
 static Dump* mdzcreator(LAMMPS* lmp, int argc, char** argv) { return new DumpMDZ(lmp, argc, argv); }
 
-extern "C" void lammpsplugin_init(void* ptr, void*, void*) {
+// The one symbol the plugin exports (it is built with hidden visibility).
+#if defined(__GNUC__)
+#define MDZ_PLUGIN_EXPORT __attribute__((visibility("default")))
+#else
+#define MDZ_PLUGIN_EXPORT
+#endif
+
+extern "C" MDZ_PLUGIN_EXPORT void lammpsplugin_init(void* ptr, void*, void*) {
     auto lmp = (LAMMPS*)ptr;
 #ifdef MDZ_STYLE_REGISTRY
     // newer LAMMPS versions keep one dump style table per process

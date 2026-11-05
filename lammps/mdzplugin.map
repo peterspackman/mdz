@@ -1,0 +1,6 @@
+/* Linker version script for mdzplugin.so: export only the entry point that
+   LAMMPS's plugin loader looks up, and make every other symbol local. */
+{
+  global: lammpsplugin_init;
+  local: *;
+};
